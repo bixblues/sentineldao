@@ -2,8 +2,17 @@
 # SentinelDAO CRE Workflow Settings
 # ==========================================================================
 # Monitors ProtectedVault contracts for suspicious activity using
-# EVM Log Triggers. When a large deposit is detected, the workflow
-# analyzes the threat and notifies the SentinelDAO backend.
+# EVM Log Triggers. When threats are detected, the workflow:
+#   1. Decodes and analyzes the event (threshold-based severity)
+#   2. POSTs threat data to backend via HTTP capability (DON consensus)
+#   3. Backend runs complex pattern detection (flash loan, TVL drain, etc.)
+#
+# Capabilities:
+#   - EVM Log Trigger (3x): Deposit, Withdrawal, EmergencyPause
+#   - HTTP Client: POST webhook notifications with DON consensus
+#
+# This replaces the custom backend indexer with decentralized,
+# consensus-verified event detection powered by the CRE DON.
 
 # ==========================================================================
 staging-settings:

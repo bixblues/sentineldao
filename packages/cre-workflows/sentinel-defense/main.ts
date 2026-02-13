@@ -1,14 +1,20 @@
 import {
   EVMClient,
+  HTTPClient,
   handler,
   bytesToHex,
   getNetwork,
   Runner,
   hexToBase64,
+  ok,
+  text,
+  consensusIdenticalAggregation,
   type Runtime,
+  type NodeRuntime,
   type EVMLog,
+  type HTTPSendRequester,
 } from "@chainlink/cre-sdk";
-import { keccak256, toBytes, formatUnits } from "viem";
+import { keccak256, toBytes, formatUnits, encodeFunctionData } from "viem";
 
 // ─── Configuration ─────────────────────────────────────────────────
 // Loaded from config.staging.json / config.production.json
@@ -21,6 +27,10 @@ type Config = {
   thresholdWei: string;
   // Backend webhook URL to notify on threat detection
   webhookUrl: string;
+  // Consumer contract address for EVM write (defense actions)
+  consumerAddress: string;
+  // Forwarder address for CRE EVM write (chain-specific)
+  forwarderAddress: string;
 };
 
 // ─── Event Signatures ──────────────────────────────────────────────
@@ -33,6 +43,72 @@ const WITHDRAWAL_EVENT_SIG = keccak256(toBytes("Withdrawal(address,uint256)"));
 // EmergencyPause(address indexed triggeredBy, uint256 timestamp)
 const PAUSE_EVENT_SIG = keccak256(toBytes("EmergencyPause(address,uint256)"));
 
+// ─── HTTP Client (DON consensus on HTTP responses) ─────────────────
+const httpClient = new HTTPClient();
+
+// ─── Helper: Send webhook notification to backend ──────────────────
+// Uses CRE HTTP capability — each DON node independently calls the
+// webhook, then consensus is reached on the response. This ensures
+// the backend receives a verified, tamper-proof notification.
+function sendWebhookNotification(
+  runtime: Runtime<Config>,
+  payload: Record<string, unknown>,
+): void {
+  const config = runtime.config;
+
+  // runInNodeMode: each node independently sends the HTTP request,
+  // then DON reaches consensus on the response status.
+  const sendNotification = httpClient.sendRequest(
+    runtime,
+    (sendRequester: HTTPSendRequester) => {
+      // RequestJson.body is a base64-encoded string
+      const bodyBytes = new TextEncoder().encode(JSON.stringify(payload));
+      const bodyBase64 = btoa(String.fromCharCode(...bodyBytes));
+
+      const response = sendRequester.sendRequest({
+        url: config.webhookUrl,
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: bodyBase64,
+      });
+
+      const result = response.result();
+      const isOk = ok(result);
+      const responseText = text(result);
+
+      return {
+        success: isOk,
+        status: result.statusCode,
+        body: responseText,
+      };
+    },
+    consensusIdenticalAggregation(),
+  );
+
+  const result = sendNotification().result();
+  runtime.log(
+    `  Webhook response: status=${result.status}, success=${result.success}`,
+  );
+}
+
+// ─── Helper: Build threat analysis result ──────────────────────────
+function analyzeAmount(
+  amountWei: bigint,
+  thresholdWei: string,
+): { severity: string; threatType: string; isLarge: boolean } {
+  const threshold = BigInt(thresholdWei);
+  const isLarge = amountWei >= threshold;
+
+  if (!isLarge) {
+    return { severity: "info", threatType: "normal_activity", isLarge: false };
+  }
+
+  const severity = amountWei >= threshold * 5n ? "critical" : "high";
+  return { severity, threatType: "large_transfer", isLarge: true };
+}
+
 // ─── Callback: Handle Deposit Events ───────────────────────────────
 // This fires when a Deposit event is emitted by the ProtectedVault.
 // The CRE DON monitors the chain, detects the log, reaches consensus,
@@ -41,7 +117,6 @@ const onDepositDetected = (runtime: Runtime<Config>, log: EVMLog): string => {
   const config = runtime.config;
   const contractAddress = bytesToHex(log.address);
   const txHash = bytesToHex(log.txHash);
-  // blockNumber may be a BigInt wrapper in WASM runtime
   const blockNumber =
     log.blockNumber != null ? `${log.blockNumber}` : "unknown";
 
@@ -51,7 +126,6 @@ const onDepositDetected = (runtime: Runtime<Config>, log: EVMLog): string => {
   runtime.log(`  Block: ${blockNumber} | Tx: ${txHash}`);
 
   // Decode the deposit amount from log.data (non-indexed uint256)
-  // log.data contains the ABI-encoded uint256 amount
   const amountHex = bytesToHex(log.data);
   const amountWei = BigInt(amountHex);
   const amountEth = formatUnits(amountWei, 18);
@@ -61,38 +135,31 @@ const onDepositDetected = (runtime: Runtime<Config>, log: EVMLog): string => {
   // Decode the depositor address from topics[1] (indexed param)
   let depositor = "unknown";
   if (log.topics.length >= 2) {
-    // Address is in the last 20 bytes of the 32-byte topic
     depositor = bytesToHex(log.topics[1].slice(12));
   }
   runtime.log(`  From: ${depositor}`);
 
   // ─── Threat Analysis ───────────────────────────────────────────
-  const threshold = BigInt(config.thresholdWei);
-  const isLargeDeposit = amountWei >= threshold;
-  const thresholdEth = formatUnits(threshold, 18);
+  const { severity, threatType, isLarge } = analyzeAmount(
+    amountWei,
+    config.thresholdWei,
+  );
+  const thresholdEth = formatUnits(BigInt(config.thresholdWei), 18);
 
-  let severity: string;
-  let threatType: string;
-
-  if (isLargeDeposit) {
-    severity = amountWei >= threshold * 5n ? "critical" : "high";
-    threatType = "large_transfer";
+  if (isLarge) {
     runtime.log(
       `  ⚠️  THREAT DETECTED: Deposit of ${amountEth} ETH exceeds ${thresholdEth} ETH threshold`,
     );
     runtime.log(`  Severity: ${severity.toUpperCase()}`);
   } else {
-    severity = "info";
-    threatType = "normal_activity";
     runtime.log(
       `  ✓ Normal deposit: ${amountEth} ETH (below ${thresholdEth} ETH threshold)`,
     );
   }
 
-  // ─── Notify Backend via Webhook ────────────────────────────────
-  // In production, this would use runtime.http() to call our API.
-  // For simulation, we log the webhook payload that would be sent.
-  const webhookPayload = JSON.stringify({
+  // ─── Notify Backend via CRE HTTP Capability ────────────────────
+  // DON nodes independently POST to our webhook, reach consensus on response
+  const webhookPayload = {
     source: "cre-workflow",
     workflowName: "sentinel-defense",
     event: "deposit_detected",
@@ -106,15 +173,16 @@ const onDepositDetected = (runtime: Runtime<Config>, log: EVMLog): string => {
       amountEth,
       threatType,
       severity,
-      isLargeDeposit,
+      isLargeDeposit: isLarge,
       thresholdEth,
       timestamp: Date.now().toString(),
     },
-  });
+  };
 
-  runtime.log(`  Webhook payload: ${webhookPayload}`);
+  runtime.log(`  Sending webhook notification to ${config.webhookUrl}...`);
+  sendWebhookNotification(runtime, webhookPayload);
 
-  if (isLargeDeposit) {
+  if (isLarge) {
     runtime.log(
       `  → Action: Recommending emergency pause for vault ${contractAddress}`,
     );
@@ -154,29 +222,25 @@ const onWithdrawalDetected = (
   runtime.log(`  To: ${recipient}`);
 
   // ─── Threat Analysis ───────────────────────────────────────────
-  const threshold = BigInt(config.thresholdWei);
-  const isLargeWithdrawal = amountWei >= threshold;
-  const thresholdEth = formatUnits(threshold, 18);
+  const { severity, threatType, isLarge } = analyzeAmount(
+    amountWei,
+    config.thresholdWei,
+  );
+  const thresholdEth = formatUnits(BigInt(config.thresholdWei), 18);
 
-  let severity: string;
-  let threatType: string;
-
-  if (isLargeWithdrawal) {
-    severity = amountWei >= threshold * 5n ? "critical" : "high";
-    threatType = "large_withdrawal";
+  if (isLarge) {
     runtime.log(
       `  ⚠️  THREAT DETECTED: Withdrawal of ${amountEth} ETH exceeds ${thresholdEth} ETH threshold`,
     );
     runtime.log(`  Severity: ${severity.toUpperCase()}`);
   } else {
-    severity = "info";
-    threatType = "normal_activity";
     runtime.log(
       `  ✓ Normal withdrawal: ${amountEth} ETH (below ${thresholdEth} ETH threshold)`,
     );
   }
 
-  const webhookPayload = JSON.stringify({
+  // ─── Notify Backend via CRE HTTP Capability ────────────────────
+  const webhookPayload = {
     source: "cre-workflow",
     workflowName: "sentinel-defense",
     event: "withdrawal_detected",
@@ -190,15 +254,16 @@ const onWithdrawalDetected = (
       amountEth,
       threatType,
       severity,
-      isLargeWithdrawal,
+      isLargeWithdrawal: isLarge,
       thresholdEth,
       timestamp: Date.now().toString(),
     },
-  });
+  };
 
-  runtime.log(`  Webhook payload: ${webhookPayload}`);
+  runtime.log(`  Sending webhook notification to ${config.webhookUrl}...`);
+  sendWebhookNotification(runtime, webhookPayload);
 
-  if (isLargeWithdrawal) {
+  if (isLarge) {
     runtime.log(
       `  → Action: Flagging large withdrawal from vault ${contractAddress}`,
     );
@@ -209,8 +274,11 @@ const onWithdrawalDetected = (
 
 // ─── Callback: Handle EmergencyPause Events ────────────────────────
 const onPauseDetected = (runtime: Runtime<Config>, log: EVMLog): string => {
+  const config = runtime.config;
   const contractAddress = bytesToHex(log.address);
   const txHash = bytesToHex(log.txHash);
+  const blockNumber =
+    log.blockNumber != null ? `${log.blockNumber}` : "unknown";
 
   let triggeredBy = "unknown";
   if (log.topics.length >= 2) {
@@ -221,7 +289,27 @@ const onPauseDetected = (runtime: Runtime<Config>, log: EVMLog): string => {
     `[SentinelDAO CRE] EmergencyPause detected on vault ${contractAddress}`,
   );
   runtime.log(`  Triggered by: ${triggeredBy}`);
-  runtime.log(`  Tx: ${txHash} | Block: ${log.blockNumber}`);
+  runtime.log(`  Tx: ${txHash} | Block: ${blockNumber}`);
+
+  // ─── Notify Backend via CRE HTTP Capability ────────────────────
+  const webhookPayload = {
+    source: "cre-workflow",
+    workflowName: "sentinel-defense",
+    event: "pause_detected",
+    data: {
+      vaultAddress: contractAddress,
+      chain: config.chainSelectorName,
+      txHash,
+      blockNumber,
+      triggeredBy,
+      threatType: "emergency_pause",
+      severity: "critical",
+      timestamp: Date.now().toString(),
+    },
+  };
+
+  runtime.log(`  Sending webhook notification to ${config.webhookUrl}...`);
+  sendWebhookNotification(runtime, webhookPayload);
 
   return `Pause detected on ${contractAddress} by ${triggeredBy}`;
 };
@@ -230,6 +318,15 @@ const onPauseDetected = (runtime: Runtime<Config>, log: EVMLog): string => {
 // Registers EVM Log Triggers with the CRE DON.
 // The DON will monitor the specified contract for matching events
 // and invoke our callbacks with consensus-verified log data.
+//
+// This workflow uses:
+//   - EVM Log Triggers (3x): Deposit, Withdrawal, EmergencyPause
+//   - HTTP Capability: POST threat data to backend webhook (DON consensus)
+//
+// Architecture:
+//   ProtectedVault emits event → CRE DON detects (consensus) →
+//   Callback decodes + analyzes → HTTP POST to backend (consensus) →
+//   Backend stores event + runs complex pattern detection
 const initWorkflow = (config: Config) => {
   const network = getNetwork({
     chainFamily: "evm",
