@@ -51,9 +51,39 @@ setInterval(() => {
   }
 }, 60_000);
 
+// CRE severity hints passed from the webhook handler
+type CREHints = {
+  creSeverity?: string;
+  creThreatType?: string;
+};
+
 class ThreatEngine {
-  async analyze(event: EventRecord, vaultId: string) {
-    // Run rule-based detection
+  async analyze(event: EventRecord, vaultId: string, creHints?: CREHints) {
+    // If CRE already flagged this as a threat (severity != info),
+    // create a threat record from the CRE analysis first.
+    // This is the primary detection path — CRE DON consensus-verified.
+    if (creHints?.creSeverity && creHints.creSeverity !== "info") {
+      const creThreat: ThreatResult = {
+        vaultId,
+        eventId: event.id,
+        type: this.formatCREThreatType(creHints.creThreatType || "unknown"),
+        severity: this.normalizeSeverity(creHints.creSeverity),
+        description: this.buildCREDescription(event, creHints),
+        chain: event.chain,
+        txHash: event.txHash,
+        amount: event.amount,
+        amountEth: event.amountEth,
+      };
+
+      const dedupKey = `cre:${vaultId}:${event.txHash}`;
+      if (!isDuplicate(dedupKey)) {
+        // Use the most appropriate rule for response type
+        const rule = await this.findBestRule(creHints.creSeverity);
+        await this.handleThreat(creThreat, rule);
+      }
+    }
+
+    // Run rule-based detection (backend-side, supplements CRE analysis)
     const rules = await db.query.alertRules.findMany({
       where: eq(alertRules.enabled, true),
     });
@@ -66,9 +96,68 @@ class ThreatEngine {
     }
 
     // Run pattern-based detection (independent of alert rules)
+    // These require DB state that CRE doesn't have access to
     await this.detectFlashLoanPattern(event, vaultId);
     await this.detectTVLDrain(event, vaultId);
     await this.correlateThreats(vaultId);
+  }
+
+  // ─── CRE Threat Helpers ───────────────────────────────────────────
+  private formatCREThreatType(creThreatType: string): string {
+    switch (creThreatType) {
+      case "large_transfer":
+        return "CRE: Large Transfer Detected";
+      case "large_withdrawal":
+        return "CRE: Large Withdrawal Detected";
+      case "emergency_pause":
+        return "CRE: Emergency Pause Detected";
+      default:
+        return `CRE: ${creThreatType}`;
+    }
+  }
+
+  private normalizeSeverity(
+    severity: string,
+  ): "critical" | "high" | "medium" | "low" | "info" {
+    const valid = ["critical", "high", "medium", "low", "info"];
+    return valid.includes(severity)
+      ? (severity as "critical" | "high" | "medium" | "low" | "info")
+      : "medium";
+  }
+
+  private buildCREDescription(event: EventRecord, hints: CREHints): string {
+    const source = "Detected by CRE DON (consensus-verified)";
+    if (event.type === "deposit" || event.type === "withdrawal") {
+      return `${event.type === "deposit" ? "Deposit" : "Withdrawal"} of ${event.amountEth} ETH flagged as ${hints.creSeverity?.toUpperCase()} by CRE workflow. ${source}. Tx: ${event.txHash?.slice(0, 14)}...`;
+    }
+    if (event.type === "pause") {
+      return `Emergency pause triggered by ${event.fromAddress}. ${source}. Tx: ${event.txHash?.slice(0, 14)}...`;
+    }
+    return `Event flagged as ${hints.creSeverity?.toUpperCase()} by CRE workflow. ${source}.`;
+  }
+
+  private async findBestRule(
+    severity: string,
+  ): Promise<typeof alertRules.$inferSelect | null> {
+    if (severity === "critical") {
+      // For critical threats, use CCIP pause rule if available
+      const ccipRule = await db.query.alertRules.findFirst({
+        where: eq(alertRules.responseType, "pause_all_ccip"),
+      });
+      if (ccipRule) return ccipRule;
+    }
+    if (severity === "critical" || severity === "high") {
+      // For high/critical, use single pause rule
+      const pauseRule = await db.query.alertRules.findFirst({
+        where: eq(alertRules.responseType, "pause_single"),
+      });
+      if (pauseRule) return pauseRule;
+    }
+    // Default: alert only
+    const alertRule = await db.query.alertRules.findFirst({
+      where: eq(alertRules.responseType, "alert_only"),
+    });
+    return alertRule || null;
   }
 
   // ─── Flash Loan Detection ──────────────────────────────────────────

@@ -3,7 +3,8 @@ import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import { config } from "./lib/config.js";
 import { wsManager } from "./lib/ws.js";
-import { startIndexer } from "./services/indexer.js";
+// Indexer removed — CRE DON is now the primary event detection layer.
+// Events arrive via POST /api/webhooks/cre from the CRE workflow.
 import { randomUUID } from "crypto";
 
 // Route imports
@@ -98,8 +99,10 @@ app.get("/api/health", async (c) => {
       auditLogging: true,
     },
     system: {
-      indexer: {
-        enabled: true,
+      detection: {
+        engine: "CRE DON (Chainlink Runtime Environment)",
+        mode: "consensus-verified",
+        dataIngestion: "POST /api/webhooks/cre",
         vaultsMonitored: allVaults.length,
         chains: [...new Set(allVaults.map((v) => v.chain))],
       },
@@ -117,14 +120,19 @@ app.get("/api/health", async (c) => {
       },
       cre: {
         workflowId: "sentinel-defense",
-        triggers: ["Deposit", "Withdrawal", "EmergencyPause"],
-        detectionPatterns: [
-          "Large Transfer",
-          "Rapid Transactions",
-          "Flash Loan",
-          "TVL Drain",
-          "Threat Correlation",
+        capabilities: [
+          "EVM Log Trigger (Deposit, Withdrawal, EmergencyPause)",
+          "HTTP Client (webhook POST with DON consensus)",
         ],
+        detectionPatterns: {
+          creNative: ["Large Transfer (threshold-based)"],
+          backendSupplemental: [
+            "Rapid Transactions",
+            "Flash Loan Pattern",
+            "TVL Drain",
+            "Threat Correlation",
+          ],
+        },
       },
     },
     timestamp: new Date().toISOString(),
@@ -347,31 +355,25 @@ async function start() {
   await initDatabase();
   await seedDefaults();
 
-  // Start chain indexer
-  const indexerEnabled = await db.query.settings.findFirst({
-    where: (s, { eq }) => eq(s.key, "indexer_enabled"),
-  });
-
-  if (indexerEnabled?.value !== false) {
-    console.log("[Indexer] Starting chain indexer...");
-    await startIndexer();
-  }
-
   console.log(`
-  ╔═══════════════════════════════════════════╗
-  ║   SentinelDAO API Server                  ║
-  ║   http://localhost:${config.port}                  ║
-  ║                                           ║
-  ║   Routes:                                 ║
-  ║   GET  /api/health                        ║
-  ║   GET  /api/overview                      ║
-  ║   CRUD /api/vaults                        ║
-  ║   CRUD /api/threats                       ║
-  ║   GET  /api/events                        ║
-  ║   CRUD /api/settings                      ║
-  ║   POST /api/webhooks/cre                  ║
-  ║   WS   ws://localhost:${config.port}/ws             ║
-  ╚═══════════════════════════════════════════╝
+  ╔═══════════════════════════════════════════════╗
+  ║   SentinelDAO API Server                      ║
+  ║   http://localhost:${config.port}                      ║
+  ║                                               ║
+  ║   Detection: CRE DON (consensus-verified)     ║
+  ║   Defense:   CCIP cross-chain pause           ║
+  ║                                               ║
+  ║   Routes:                                     ║
+  ║   GET  /api/health                            ║
+  ║   GET  /api/overview                          ║
+  ║   CRUD /api/vaults                            ║
+  ║   CRUD /api/threats                           ║
+  ║   GET  /api/events                            ║
+  ║   CRUD /api/settings                          ║
+  ║   POST /api/webhooks/cre  ← CRE data ingest  ║
+  ║   POST /api/simulate/attack                   ║
+  ║   WS   ws://localhost:${config.port}/ws                 ║
+  ╚═══════════════════════════════════════════════╝
   `);
 }
 

@@ -3,7 +3,7 @@ import { z } from "zod";
 import { db } from "../db/index.js";
 import { vaults } from "../db/schema.js";
 import { eq } from "drizzle-orm";
-import { getVaultOnChainData } from "../services/indexer.js";
+import { getVaultOnChainData } from "../services/chain-reader.js";
 import { defenseExecutor } from "../services/defense-executor.js";
 import { wsManager } from "../lib/ws.js";
 import { randomUUID } from "crypto";
