@@ -14,6 +14,7 @@ import { db } from "../db/index.js";
 import { vaults } from "../db/schema.js";
 import { eq } from "drizzle-orm";
 import { wsManager } from "../lib/ws.js";
+import { creRunner } from "../services/cre-runner.js";
 
 const app = new Hono();
 
@@ -164,7 +165,7 @@ app.post("/attack", async (c) => {
         wsManager.broadcast("simulation_step", {
           step: 3,
           total: 3,
-          message: `Deposit confirmed in block ${receipt.blockNumber}. Indexer will detect and analyze.`,
+          message: `Deposit confirmed in block ${receipt.blockNumber}. Triggering CRE workflow...`,
           txHash,
           blockNumber: Number(receipt.blockNumber),
         });
@@ -175,7 +176,8 @@ app.post("/attack", async (c) => {
           txHash,
           amount: amountEth,
           blockNumber: Number(receipt.blockNumber),
-          message: `Deposited ${amountEth} ETH (above ${vault.alertThresholdEth} threshold). The indexer will detect this event and the threat engine will evaluate it against alert rules.`,
+          message: `Deposited ${amountEth} ETH (above ${vault.alertThresholdEth} threshold). CRE workflow will detect and analyze this event.`,
+          creSimulation: triggerCRESimulation(txHash, "deposit"),
         });
       }
 
@@ -228,7 +230,7 @@ app.post("/attack", async (c) => {
         wsManager.broadcast("simulation_step", {
           step: 3,
           total: 3,
-          message: `All ${count} transactions confirmed. The threat engine will detect the rapid transaction pattern.`,
+          message: `All ${count} transactions confirmed. CRE workflow will detect the rapid transaction pattern.`,
         });
 
         return c.json({
@@ -236,7 +238,11 @@ app.post("/attack", async (c) => {
           type: "rapid_transactions",
           txHashes,
           count,
-          message: `Sent ${count} rapid deposits in quick succession. The threat engine will detect the rapid transaction pattern.`,
+          message: `Sent ${count} rapid deposits in quick succession. CRE workflow will detect the rapid transaction pattern.`,
+          creSimulation: triggerCRESimulation(
+            txHashes[txHashes.length - 1],
+            "deposit",
+          ),
         });
       }
 
@@ -350,7 +356,7 @@ app.post("/attack", async (c) => {
         wsManager.broadcast("simulation_step", {
           step: 4,
           total: 4,
-          message: `Flash loan complete: deposit block ${depositReceipt.blockNumber}, withdrawal block ${withdrawReceipt.blockNumber} (${blockGap} block gap). Threat engine will detect the pattern.`,
+          message: `Flash loan complete: deposit block ${depositReceipt.blockNumber}, withdrawal block ${withdrawReceipt.blockNumber} (${blockGap} block gap). CRE workflow will detect the pattern.`,
         });
 
         return c.json({
@@ -361,7 +367,8 @@ app.post("/attack", async (c) => {
           txHash: withdrawHash,
           amount: flashAmountEth,
           blockGap,
-          message: `Flash loan simulated: ${flashAmountEth} ETH deposited and withdrawn within ${blockGap} block(s). The threat engine will detect the flash loan pattern.`,
+          message: `Flash loan simulated: ${flashAmountEth} ETH deposited and withdrawn within ${blockGap} block(s). CRE workflow will detect the flash loan pattern.`,
+          creSimulation: triggerCRESimulation(withdrawHash, "withdrawal"),
         });
       }
 
@@ -435,7 +442,7 @@ app.post("/attack", async (c) => {
         wsManager.broadcast("simulation_step", {
           step: 3,
           total: 3,
-          message: `TVL drain confirmed in block ${drainReceipt.blockNumber}. Threat engine will flag the TVL drain pattern.`,
+          message: `TVL drain confirmed in block ${drainReceipt.blockNumber}. CRE workflow will flag the TVL drain pattern.`,
           txHash: drainHash,
         });
 
@@ -444,7 +451,8 @@ app.post("/attack", async (c) => {
           type: "tvl_drain",
           txHash: drainHash,
           amount: formatEther(drainAmount),
-          message: `Drained ${formatEther(drainAmount)} ETH from vault. The threat engine will detect the TVL drain pattern.`,
+          message: `Drained ${formatEther(drainAmount)} ETH from vault. CRE workflow will detect the TVL drain pattern.`,
+          creSimulation: triggerCRESimulation(drainHash, "withdrawal"),
         });
       }
 
@@ -472,7 +480,7 @@ app.post("/attack", async (c) => {
         wsManager.broadcast("simulation_step", {
           step: 2,
           total: 2,
-          message: `Emergency pause confirmed in block ${pauseReceipt.blockNumber}. Threat engine will flag the unauthorized access.`,
+          message: `Emergency pause confirmed in block ${pauseReceipt.blockNumber}. CRE workflow will flag the unauthorized access.`,
           txHash: pauseHash,
         });
 
@@ -480,7 +488,8 @@ app.post("/attack", async (c) => {
           success: true,
           type: "unauthorized_pause",
           txHash: pauseHash,
-          message: `Emergency pause triggered on vault. The threat engine will detect this as an unauthorized access event.`,
+          message: `Emergency pause triggered on vault. CRE workflow will detect this as an unauthorized access event.`,
+          creSimulation: triggerCRESimulation(pauseHash, "pause"),
         });
       }
 
@@ -532,6 +541,59 @@ app.get("/balance", async (c) => {
     balance: totalEth.toFixed(6),
     balances,
     chain: "multi-chain",
+  });
+});
+
+// ─── CRE Simulation Helper ──────────────────────────────────────────
+// Fire-and-forget: triggers CRE workflow simulation for a transaction.
+// Returns immediately with a tracking status; the CRE simulation runs
+// in the background and delivers results via the webhook.
+function triggerCRESimulation(txHash: string, eventType: string): string {
+  // Fire and forget — don't await
+  creRunner.simulate(txHash, eventType).catch((err) => {
+    console.error(`[CRE Runner] Background simulation failed: ${err}`);
+  });
+  return "triggered";
+}
+
+// POST /api/simulate/cre — manually trigger CRE simulation for a tx hash
+app.post("/cre", async (c) => {
+  const body = await c.req.json();
+  const { txHash, eventType, eventIndex } = body;
+
+  if (!txHash) {
+    return c.json({ error: "txHash is required" }, 400);
+  }
+
+  const validTypes = ["deposit", "withdrawal", "pause"];
+  if (!validTypes.includes(eventType || "deposit")) {
+    return c.json(
+      { error: `Invalid eventType. Supported: ${validTypes.join(", ")}` },
+      400,
+    );
+  }
+
+  const result = await creRunner.simulate(
+    txHash,
+    eventType || "deposit",
+    eventIndex || 0,
+  );
+
+  return c.json({
+    success: result.success,
+    duration: result.duration,
+    output: result.output.slice(0, 2000),
+    error: result.error,
+  });
+});
+
+// GET /api/simulate/cre-status — check CRE CLI availability
+app.get("/cre-status", async (c) => {
+  const version = await creRunner.getVersion();
+  return c.json({
+    available: version !== "not installed",
+    version,
+    workflowDir: "packages/cre-workflows/sentinel-defense",
   });
 });
 
