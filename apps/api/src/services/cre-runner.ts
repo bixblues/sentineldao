@@ -1,4 +1,5 @@
 import { spawn } from "child_process";
+import { resolve } from "path";
 import { config } from "../lib/config.js";
 import { wsManager } from "../lib/ws.js";
 
@@ -15,8 +16,14 @@ import { wsManager } from "../lib/ws.js";
 //   CRE workflow detects event → analyzes threat → POSTs to webhook →
 //   Backend processes the CRE-verified event
 
-// Path to the CRE workflow directory (relative to project root)
-const CRE_WORKFLOW_DIR = "../../packages/cre-workflows/sentinel-defense";
+// Absolute path to the CRE CLI binary
+const CRE_BIN = resolve(process.env.HOME || "~", ".cre/bin/cre");
+
+// CRE project root (where project.yaml lives) — cwd for the CLI
+const CRE_PROJECT_ROOT = resolve(process.cwd(), "../../packages/cre-workflows");
+
+// Workflow folder name (passed as argument to `cre workflow simulate`)
+const CRE_WORKFLOW_NAME = "sentinel-defense";
 
 // Map our chain keys to CRE trigger indices in the workflow
 // The workflow registers triggers in this order:
@@ -156,7 +163,7 @@ class CRERunner {
       const args = [
         "workflow",
         "simulate",
-        ".",
+        CRE_WORKFLOW_NAME,
         "--target",
         "staging-settings",
         "--evm-tx-hash",
@@ -173,11 +180,13 @@ class CRERunner {
       let stdout = "";
       let stderr = "";
 
-      const proc = spawn("cre", args, {
-        cwd: new URL(CRE_WORKFLOW_DIR, import.meta.url).pathname,
+      console.log(`[CRE Runner] CRE binary: ${CRE_BIN}`);
+      console.log(`[CRE Runner] Project root: ${CRE_PROJECT_ROOT}`);
+
+      const proc = spawn(CRE_BIN, args, {
+        cwd: CRE_PROJECT_ROOT,
         env: {
           ...process.env,
-          // Ensure CRE CLI can find the project
           PATH: `${process.env.HOME}/.cre/bin:${process.env.PATH}`,
         },
         timeout: 120_000, // 2 minute timeout
@@ -225,7 +234,7 @@ class CRERunner {
   // ─── Get CRE CLI Version ──────────────────────────────────────
   async getVersion(): Promise<string> {
     return new Promise((resolve) => {
-      const proc = spawn("cre", ["--version"], {
+      const proc = spawn(CRE_BIN, ["--version"], {
         env: {
           ...process.env,
           PATH: `${process.env.HOME}/.cre/bin:${process.env.PATH}`,

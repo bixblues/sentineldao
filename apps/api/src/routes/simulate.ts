@@ -362,8 +362,19 @@ app.post("/attack", async (c) => {
         wsManager.broadcast("simulation_step", {
           step: 4,
           total: 4,
-          message: `Flash loan complete: deposit block ${depositReceipt.blockNumber}, withdrawal block ${withdrawReceipt.blockNumber} (${blockGap} block gap). CRE workflow will detect the pattern.`,
+          message: `Flash loan complete: deposit block ${depositReceipt.blockNumber}, withdrawal block ${withdrawReceipt.blockNumber} (${blockGap} block gap). Triggering CRE for both events...`,
         });
+
+        // Flash loan detection requires BOTH events in the DB.
+        // Trigger CRE for the deposit first and await it so the event is
+        // stored before the withdrawal arrives and the pattern detector runs.
+        const depositSim = await creRunner
+          .simulate(depositHash, "deposit")
+          .catch((err) => {
+            console.error(`[CRE Runner] Deposit simulation failed: ${err}`);
+          });
+        // Small delay to ensure the webhook handler finishes DB insert
+        if (depositSim?.success) await new Promise((r) => setTimeout(r, 1000));
 
         return c.json({
           success: true,

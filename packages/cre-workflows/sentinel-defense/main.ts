@@ -43,6 +43,41 @@ const WITHDRAWAL_EVENT_SIG = keccak256(toBytes("Withdrawal(address,uint256)"));
 // EmergencyPause(address indexed triggeredBy, uint256 timestamp)
 const PAUSE_EVENT_SIG = keccak256(toBytes("EmergencyPause(address,uint256)"));
 
+// ─── Pure-JS Base64 encoder (btoa/Buffer not available in CRE runtime) ──
+const B64_CHARS =
+  "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+function toBase64(str: string): string {
+  let result = "";
+  const len = str.length;
+  for (let i = 0; i < len; i += 3) {
+    const a = str.charCodeAt(i);
+    const b = i + 1 < len ? str.charCodeAt(i + 1) : 0;
+    const c = i + 2 < len ? str.charCodeAt(i + 2) : 0;
+    const triplet = (a << 16) | (b << 8) | c;
+    result += B64_CHARS[(triplet >> 18) & 0x3f];
+    result += B64_CHARS[(triplet >> 12) & 0x3f];
+    result += i + 1 < len ? B64_CHARS[(triplet >> 6) & 0x3f] : "=";
+    result += i + 2 < len ? B64_CHARS[triplet & 0x3f] : "=";
+  }
+  return result;
+}
+
+// ─── Helper: Convert protobuf BigInt to string ──────────────────────
+// log.blockNumber is a protobuf BigInt { absVal: Uint8Array, sign: bigint }
+// not a JS number, so template literals produce "[object Object]".
+function protoBlockNumber(
+  pb: { absVal?: Uint8Array; sign?: bigint } | undefined | null,
+): string {
+  if (!pb || !pb.absVal || pb.absVal.length === 0) return "0";
+  let hex = "";
+  for (let i = 0; i < pb.absVal.length; i++) {
+    hex += pb.absVal[i].toString(16).padStart(2, "0");
+  }
+  // Parse as big-endian unsigned integer, apply sign
+  const val = BigInt("0x" + hex);
+  return (pb.sign && pb.sign < 0n ? -val : val).toString();
+}
+
 // ─── HTTP Client (DON consensus on HTTP responses) ─────────────────
 const httpClient = new HTTPClient();
 
@@ -62,8 +97,9 @@ function sendWebhookNotification(
     runtime,
     (sendRequester: HTTPSendRequester) => {
       // RequestJson.body is a base64-encoded string
-      const bodyBytes = new TextEncoder().encode(JSON.stringify(payload));
-      const bodyBase64 = btoa(String.fromCharCode(...bodyBytes));
+      // Note: btoa/Buffer are not available in the CRE runtime
+      const bodyJson = JSON.stringify(payload);
+      const bodyBase64 = toBase64(bodyJson);
 
       const response = sendRequester.sendRequest({
         url: config.webhookUrl,
@@ -117,8 +153,7 @@ const onDepositDetected = (runtime: Runtime<Config>, log: EVMLog): string => {
   const config = runtime.config;
   const contractAddress = bytesToHex(log.address);
   const txHash = bytesToHex(log.txHash);
-  const blockNumber =
-    log.blockNumber != null ? `${log.blockNumber}` : "unknown";
+  const blockNumber = protoBlockNumber(log.blockNumber as any);
 
   runtime.log(
     `[SentinelDAO CRE] Deposit event detected on vault ${contractAddress}`,
@@ -199,8 +234,7 @@ const onWithdrawalDetected = (
   const config = runtime.config;
   const contractAddress = bytesToHex(log.address);
   const txHash = bytesToHex(log.txHash);
-  const blockNumber =
-    log.blockNumber != null ? `${log.blockNumber}` : "unknown";
+  const blockNumber = protoBlockNumber(log.blockNumber as any);
 
   runtime.log(
     `[SentinelDAO CRE] Withdrawal event detected on vault ${contractAddress}`,
@@ -277,8 +311,7 @@ const onPauseDetected = (runtime: Runtime<Config>, log: EVMLog): string => {
   const config = runtime.config;
   const contractAddress = bytesToHex(log.address);
   const txHash = bytesToHex(log.txHash);
-  const blockNumber =
-    log.blockNumber != null ? `${log.blockNumber}` : "unknown";
+  const blockNumber = protoBlockNumber(log.blockNumber as any);
 
   let triggeredBy = "unknown";
   if (log.topics.length >= 2) {
