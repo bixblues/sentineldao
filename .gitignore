@@ -49,3 +49,5 @@ apps/api/data/
 bun.lock
 DEMO_SCRIPT.md
 packages/contracts/lib/
+PLAN.md
+CRE_EARLY_ACCESS.md
