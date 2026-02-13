@@ -186,29 +186,40 @@ async function handleCREWebhook(
     });
   }
 
-  // Run through threat engine for complex pattern detection
-  // The CRE workflow already did threshold analysis — the threat engine
-  // adds flash loan detection, TVL drain, rapid tx correlation, etc.
-  // Pass the CRE severity as a hint so the engine can use it
-  await threatEngine.analyze(eventRecord, vaultRecord.id, {
-    creSeverity: data.severity,
-    creThreatType: data.threatType,
-  });
+  // Run threat analysis in the background so we can return 200 immediately.
+  // Defense actions (on-chain pause, CCIP cross-chain) can take 30-60s and
+  // would otherwise exceed the CRE HTTP capability's timeout.
+  const analyzeInBackground = async () => {
+    try {
+      await threatEngine.analyze(eventRecord, vaultRecord.id, {
+        creSeverity: data.severity,
+        creThreatType: data.threatType,
+      });
 
-  // Broadcast CRE workflow activity for dashboard monitoring
-  wsManager.broadcast("cre_callback", {
-    source: "cre-workflow",
-    event,
-    chain: data.chain,
-    vault: data.vaultAddress,
-    severity: data.severity,
-    threatType: data.threatType,
-    timestamp: new Date().toISOString(),
-  });
+      // Broadcast CRE workflow activity for dashboard monitoring
+      wsManager.broadcast("cre_callback", {
+        source: "cre-workflow",
+        event,
+        chain: data.chain,
+        vault: data.vaultAddress,
+        severity: data.severity,
+        threatType: data.threatType,
+        timestamp: new Date().toISOString(),
+      });
 
-  console.log(
-    `[CRE Webhook] Processed ${event}: stored event ${eventRecord.id}, threat analysis complete`,
-  );
+      console.log(
+        `[CRE Webhook] Processed ${event}: stored event ${eventRecord.id}, threat analysis complete`,
+      );
+    } catch (err) {
+      console.error(
+        `[CRE Webhook] Background threat analysis failed for ${eventRecord.id}:`,
+        err,
+      );
+    }
+  };
+
+  // Fire-and-forget — don't await
+  analyzeInBackground();
 
   return c.json({
     received: true,
