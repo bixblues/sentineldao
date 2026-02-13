@@ -1,0 +1,30 @@
+{
+  "name": "sentineldao",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Autonomous Cross-Chain Protocol Defense System",
+  "scripts": {
+    "dev": "pnpm --filter @sentineldao/dashboard dev",
+    "dev:api": "cd apps/api && bun run dev",
+    "dev:all": "cd apps/api && bun run dev & pnpm --filter @sentineldao/dashboard dev",
+    "build": "pnpm -r build",
+    "lint": "pnpm -r lint",
+    "test": "pnpm -r test",
+    "clean": "pnpm -r clean"
+  },
+  "keywords": [
+    "defi",
+    "security",
+    "chainlink",
+    "cre",
+    "ccip",
+    "cross-chain"
+  ],
+  "author": "SentinelDAO",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "packageManager": "pnpm@9.15.0"
+}
