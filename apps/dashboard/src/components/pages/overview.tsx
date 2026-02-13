@@ -592,10 +592,19 @@ export function OverviewPage() {
                 </Badge>
               </div>
               <div className="flex items-center justify-between text-xs">
-                <span className="text-muted-foreground">CRE Workflow</span>
+                <span className="text-muted-foreground">Detection Engine</span>
                 <Badge
                   variant="outline"
                   className="text-primary border-primary/30 text-[10px]"
+                >
+                  CRE DON
+                </Badge>
+              </div>
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-muted-foreground">CRE Workflow</span>
+                <Badge
+                  variant="outline"
+                  className="text-blue-500 border-blue-500/30 text-[10px]"
                 >
                   {health?.system?.cre?.workflowId || "sentinel-defense"}
                 </Badge>
@@ -611,7 +620,10 @@ export function OverviewPage() {
                   Detection Patterns
                 </span>
                 <span className="font-medium text-foreground">
-                  {health?.system?.cre?.detectionPatterns?.length ?? 0}
+                  {(health?.system?.cre?.detectionPatterns?.creNative?.length ??
+                    0) +
+                    (health?.system?.cre?.detectionPatterns?.backendSupplemental
+                      ?.length ?? 0)}
                 </span>
               </div>
             </CardContent>

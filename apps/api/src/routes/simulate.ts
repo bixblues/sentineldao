@@ -42,7 +42,7 @@ function getClients(chainKey: string) {
     chain: entry.chain,
     transport: http(entry.rpc),
   });
-  return { walletClient, publicClient, account };
+  return { walletClient, publicClient, account, chain: entry.chain };
 }
 
 // POST /api/simulate/attack — simulate an attack scenario
@@ -74,7 +74,7 @@ app.post("/attack", async (c) => {
     );
   }
 
-  const { walletClient, publicClient, account } = clients;
+  const { walletClient, publicClient, account, chain: clientChain } = clients;
   const vaultAddress = vault.address as `0x${string}`;
 
   // Broadcast simulation start
@@ -101,6 +101,7 @@ app.post("/attack", async (c) => {
           message: "Vault is paused — auto-unpausing before simulation...",
         });
         const unpauseTx = await walletClient.writeContract({
+          chain: clientChain,
           address: vaultAddress,
           abi: protectedVaultAbi,
           functionName: "unpause",
@@ -144,6 +145,7 @@ app.post("/attack", async (c) => {
         });
 
         const txHash = await walletClient.writeContract({
+          chain: clientChain,
           address: vaultAddress,
           abi: protectedVaultAbi,
           functionName: "deposit",
@@ -202,6 +204,7 @@ app.post("/attack", async (c) => {
         // Fire all transactions without waiting for confirmation (parallel send)
         for (let i = 0; i < count; i++) {
           const txHash = await walletClient.writeContract({
+            chain: clientChain,
             address: vaultAddress,
             abi: protectedVaultAbi,
             functionName: "deposit",
@@ -269,6 +272,7 @@ app.post("/attack", async (c) => {
         });
 
         const txHash = await walletClient.writeContract({
+          chain: clientChain,
           address: vaultAddress,
           abi: protectedVaultAbi,
           functionName: "withdraw",
@@ -311,6 +315,7 @@ app.post("/attack", async (c) => {
         });
 
         const depositHash = await walletClient.writeContract({
+          chain: clientChain,
           address: vaultAddress,
           abi: protectedVaultAbi,
           functionName: "deposit",
@@ -331,6 +336,7 @@ app.post("/attack", async (c) => {
 
         // Withdraw immediately — same amount to mimic flash loan
         const withdrawHash = await walletClient.writeContract({
+          chain: clientChain,
           address: vaultAddress,
           abi: protectedVaultAbi,
           functionName: "withdraw",
@@ -391,6 +397,7 @@ app.post("/attack", async (c) => {
           });
 
           const seedHash = await walletClient.writeContract({
+            chain: clientChain,
             address: vaultAddress,
             abi: protectedVaultAbi,
             functionName: "deposit",
@@ -428,6 +435,7 @@ app.post("/attack", async (c) => {
         });
 
         const drainHash = await walletClient.writeContract({
+          chain: clientChain,
           address: vaultAddress,
           abi: protectedVaultAbi,
           functionName: "withdraw",
@@ -467,6 +475,7 @@ app.post("/attack", async (c) => {
         });
 
         const pauseHash = await walletClient.writeContract({
+          chain: clientChain,
           address: vaultAddress,
           abi: protectedVaultAbi,
           functionName: "emergencyPause",

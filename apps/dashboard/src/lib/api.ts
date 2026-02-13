@@ -131,8 +131,10 @@ export const api = {
         auditLogging: boolean;
       };
       system: {
-        indexer: {
-          enabled: boolean;
+        detection: {
+          engine: string;
+          mode: string;
+          dataIngestion: string;
           vaultsMonitored: number;
           chains: string[];
         };
@@ -145,8 +147,11 @@ export const api = {
         defense: { configured: boolean; ccipConfigured: boolean };
         cre: {
           workflowId: string;
-          triggers: string[];
-          detectionPatterns: string[];
+          capabilities: string[];
+          detectionPatterns: {
+            creNative: string[];
+            backendSupplemental: string[];
+          };
         };
       };
       timestamp: string;
