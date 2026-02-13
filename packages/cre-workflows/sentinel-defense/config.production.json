@@ -1,0 +1,6 @@
+{
+  "vaultAddress": "0xcdCc7e3d66221c22A7D2c1490120e199568fd11D",
+  "chainSelectorName": "ethereum-testnet-sepolia",
+  "thresholdWei": "100000000000000000",
+  "webhookUrl": "https://api.sentineldao.xyz/api/webhooks/cre"
+}

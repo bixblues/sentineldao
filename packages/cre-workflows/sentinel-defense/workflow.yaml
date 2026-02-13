@@ -1,0 +1,24 @@
+# ==========================================================================
+# SentinelDAO CRE Workflow Settings
+# ==========================================================================
+# Monitors ProtectedVault contracts for suspicious activity using
+# EVM Log Triggers. When a large deposit is detected, the workflow
+# analyzes the threat and notifies the SentinelDAO backend.
+
+# ==========================================================================
+staging-settings:
+  user-workflow:
+    workflow-name: "sentinel-defense-staging"
+  workflow-artifacts:
+    workflow-path: "./main.ts"
+    config-path: "./config.staging.json"
+    secrets-path: ""
+
+# ==========================================================================
+production-settings:
+  user-workflow:
+    workflow-name: "sentinel-defense-production"
+  workflow-artifacts:
+    workflow-path: "./main.ts"
+    config-path: "./config.production.json"
+    secrets-path: ""
