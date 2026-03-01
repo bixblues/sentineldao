@@ -233,19 +233,22 @@ app.post("/attack", async (c) => {
         wsManager.broadcast("simulation_step", {
           step: 3,
           total: 3,
-          message: `All ${count} transactions confirmed. CRE workflow will detect the rapid transaction pattern.`,
+          message: `All ${count} transactions confirmed. Triggering CRE simulations for all ${count} deposits...`,
         });
+
+        // Trigger CRE simulation for ALL transactions, not just the last one
+        // This ensures the threat engine can detect the rapid transaction pattern
+        for (const txHash of txHashes) {
+          triggerCRESimulation(txHash, "deposit");
+        }
 
         return c.json({
           success: true,
           type: "rapid_transactions",
           txHashes,
           count,
-          message: `Sent ${count} rapid deposits in quick succession. CRE workflow will detect the rapid transaction pattern.`,
-          creSimulation: triggerCRESimulation(
-            txHashes[txHashes.length - 1],
-            "deposit",
-          ),
+          message: `Sent ${count} rapid deposits in quick succession. CRE workflow will process all ${count} events.`,
+          creSimulation: "triggered_all",
         });
       }
 
