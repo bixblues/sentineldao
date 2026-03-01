@@ -3,10 +3,17 @@ const WS_BASE = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:3001";
 
 // ─── Generic fetch wrapper ──────────────────────────────────────────
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
+  // Get token from localStorage
+  const token =
+    typeof window !== "undefined"
+      ? localStorage.getItem("sentinel_token")
+      : null;
+
   const res = await fetch(`${API_BASE}${path}`, {
     ...options,
     headers: {
       "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...options?.headers,
     },
   });
