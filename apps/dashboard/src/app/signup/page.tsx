@@ -4,7 +4,18 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/contexts/auth-context";
-import { Shield, AlertCircle } from "lucide-react";
+import { Shield, AlertCircle, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -55,152 +66,131 @@ export default function SignupPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-purple-600 rounded-2xl mb-4">
-            <Shield className="w-8 h-8 text-white" />
+          <div className="inline-flex items-center justify-center w-12 h-12 bg-purple-600/10 border border-purple-500/20 rounded-xl mb-4">
+            <Shield className="w-6 h-6 text-purple-500" />
           </div>
-          <h1 className="text-3xl font-bold text-white mb-2">SentinelDAO</h1>
-          <p className="text-slate-400">Create your organization</p>
+          <h1 className="text-2xl font-bold text-white mb-1">Get started</h1>
+          <p className="text-sm text-slate-400">
+            Create your SentinelDAO organization
+          </p>
         </div>
 
-        <div className="bg-slate-800 rounded-2xl shadow-xl p-8 border border-slate-700">
-          <form onSubmit={handleSubmit} className="space-y-5">
-            {error && (
-              <div className="bg-red-500/10 border border-red-500/50 rounded-lg p-4 flex items-start gap-3">
-                <AlertCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
-                <p className="text-sm text-red-200">{error}</p>
-              </div>
-            )}
-
-            <div>
-              <label
-                htmlFor="organizationName"
-                className="block text-sm font-medium text-slate-300 mb-2"
-              >
-                Organization Name
-              </label>
-              <input
-                id="organizationName"
-                type="text"
-                value={formData.organizationName}
-                onChange={(e) =>
-                  handleChange("organizationName", e.target.value)
-                }
-                required
-                className="w-full px-4 py-3 bg-slate-900 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                placeholder="Acme Corp"
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor="name"
-                className="block text-sm font-medium text-slate-300 mb-2"
-              >
-                Your Name
-              </label>
-              <input
-                id="name"
-                type="text"
-                value={formData.name}
-                onChange={(e) => handleChange("name", e.target.value)}
-                required
-                className="w-full px-4 py-3 bg-slate-900 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                placeholder="John Doe"
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor="email"
-                className="block text-sm font-medium text-slate-300 mb-2"
-              >
-                Email
-              </label>
-              <input
-                id="email"
-                type="email"
-                value={formData.email}
-                onChange={(e) => handleChange("email", e.target.value)}
-                required
-                className="w-full px-4 py-3 bg-slate-900 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                placeholder="you@company.com"
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor="password"
-                className="block text-sm font-medium text-slate-300 mb-2"
-              >
-                Password
-              </label>
-              <input
-                id="password"
-                type="password"
-                value={formData.password}
-                onChange={(e) => handleChange("password", e.target.value)}
-                required
-                className="w-full px-4 py-3 bg-slate-900 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                placeholder="••••••••"
-              />
-              <p className="text-xs text-slate-500 mt-1">
-                At least 8 characters
-              </p>
-            </div>
-
-            <div>
-              <label
-                htmlFor="confirmPassword"
-                className="block text-sm font-medium text-slate-300 mb-2"
-              >
-                Confirm Password
-              </label>
-              <input
-                id="confirmPassword"
-                type="password"
-                value={formData.confirmPassword}
-                onChange={(e) =>
-                  handleChange("confirmPassword", e.target.value)
-                }
-                required
-                className="w-full px-4 py-3 bg-slate-900 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                placeholder="••••••••"
-              />
-            </div>
-
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full bg-purple-600 hover:bg-purple-700 disabled:bg-purple-600/50 text-white font-medium py-3 px-4 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2"
-            >
-              {isLoading ? (
-                <>
-                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  Creating account...
-                </>
-              ) : (
-                "Create account"
+        <Card className="border-slate-800 bg-slate-900/50">
+          <CardHeader>
+            <CardTitle>Create account</CardTitle>
+            <CardDescription>
+              Set up your organization and start monitoring
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {error && (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
               )}
-            </button>
-          </form>
 
-          <div className="mt-6 text-center">
-            <p className="text-sm text-slate-400">
-              Already have an account?{" "}
-              <Link
-                href="/login"
-                className="text-purple-400 hover:text-purple-300 font-medium"
-              >
-                Sign in
-              </Link>
-            </p>
-          </div>
-        </div>
+              <div className="space-y-2">
+                <Label htmlFor="organizationName">Organization Name</Label>
+                <Input
+                  id="organizationName"
+                  type="text"
+                  value={formData.organizationName}
+                  onChange={(e) =>
+                    handleChange("organizationName", e.target.value)
+                  }
+                  required
+                  placeholder="Acme Corp"
+                  className="bg-slate-950 border-slate-800"
+                />
+              </div>
 
-        <p className="text-center text-sm text-slate-500 mt-8">
+              <div className="space-y-2">
+                <Label htmlFor="name">Your Name</Label>
+                <Input
+                  id="name"
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) => handleChange("name", e.target.value)}
+                  required
+                  placeholder="John Doe"
+                  className="bg-slate-950 border-slate-800"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => handleChange("email", e.target.value)}
+                  required
+                  placeholder="you@company.com"
+                  className="bg-slate-950 border-slate-800"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="password">Password</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  value={formData.password}
+                  onChange={(e) => handleChange("password", e.target.value)}
+                  required
+                  placeholder="••••••••"
+                  className="bg-slate-950 border-slate-800"
+                />
+                <p className="text-xs text-slate-500">At least 8 characters</p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="confirmPassword">Confirm Password</Label>
+                <Input
+                  id="confirmPassword"
+                  type="password"
+                  value={formData.confirmPassword}
+                  onChange={(e) =>
+                    handleChange("confirmPassword", e.target.value)
+                  }
+                  required
+                  placeholder="••••••••"
+                  className="bg-slate-950 border-slate-800"
+                />
+              </div>
+
+              <Button type="submit" disabled={isLoading} className="w-full">
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Creating account...
+                  </>
+                ) : (
+                  "Create account"
+                )}
+              </Button>
+
+              <div className="text-center text-sm">
+                <span className="text-slate-400">
+                  Already have an account?{" "}
+                </span>
+                <Link
+                  href="/login"
+                  className="text-purple-400 hover:text-purple-300 font-medium"
+                >
+                  Sign in
+                </Link>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+
+        <p className="text-center text-xs text-slate-500 mt-6">
           Secure vault monitoring powered by Chainlink
         </p>
       </div>
