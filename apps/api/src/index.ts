@@ -29,7 +29,15 @@ import { auditLog, initAuditLogTable } from "./middleware/audit-log.js";
 
 // Initialize database tables on startup
 import { db } from "./db/index.js";
-import { vaults, alertRules, integrations, settings } from "./db/schema.js";
+import {
+  tenants,
+  users,
+  memberships,
+  vaults,
+  alertRules,
+  integrations,
+  settings,
+} from "./db/schema.js";
 import { sql } from "drizzle-orm";
 
 const app = new Hono();
@@ -270,6 +278,27 @@ async function initDatabase() {
 }
 
 async function seedDefaults() {
+  // Create demo tenant if none exist
+  const existingTenants = await db.query.tenants.findMany();
+  let demoTenantId: string;
+
+  if (existingTenants.length === 0) {
+    console.log("[DB] Creating demo tenant...");
+    demoTenantId = randomUUID();
+    await db.insert(tenants).values({
+      id: demoTenantId,
+      name: "Demo Organization",
+      slug: "demo-org",
+      ownerEmail: "demo@sentineldao.com",
+      plan: "pro",
+      status: "active",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+  } else {
+    demoTenantId = existingTenants[0].id;
+  }
+
   // Seed default vaults if none exist (multi-chain)
   const existingVaults = await db.query.vaults.findMany();
   if (existingVaults.length === 0) {
@@ -277,6 +306,7 @@ async function seedDefaults() {
     await db.insert(vaults).values([
       {
         id: randomUUID(),
+        tenantId: demoTenantId,
         name: "Sepolia Treasury",
         address: "0xcdcc7e3d66221c22a7d2c1490120e199568fd11d",
         chain: "ethereum-sepolia",
@@ -286,6 +316,7 @@ async function seedDefaults() {
       },
       {
         id: randomUUID(),
+        tenantId: demoTenantId,
         name: "Arbitrum Vault",
         address: "0x24ae95b0b57e07fc65c79ad133db6e398722b4a1",
         chain: "arbitrum-sepolia",
@@ -295,6 +326,7 @@ async function seedDefaults() {
       },
       {
         id: randomUUID(),
+        tenantId: demoTenantId,
         name: "Base Vault",
         address: "0x24ae95b0b57e07fc65c79ad133db6e398722b4a1",
         chain: "base-sepolia",
@@ -312,6 +344,7 @@ async function seedDefaults() {
     await db.insert(alertRules).values([
       {
         id: randomUUID(),
+        tenantId: demoTenantId,
         name: "Large Transfer Alert",
         type: "large_transfer",
         enabled: true,
@@ -321,6 +354,7 @@ async function seedDefaults() {
       },
       {
         id: randomUUID(),
+        tenantId: demoTenantId,
         name: "Rapid Transaction Alert",
         type: "rapid_transactions",
         enabled: true,
@@ -330,6 +364,7 @@ async function seedDefaults() {
       },
       {
         id: randomUUID(),
+        tenantId: demoTenantId,
         name: "Unauthorized Access Alert",
         type: "unauthorized_access",
         enabled: true,
