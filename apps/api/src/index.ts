@@ -215,9 +215,40 @@ app.get("/api/overview", async (c) => {
 async function initDatabase() {
   console.log("[DB] Initializing database tables...");
 
+  // Create multi-tenant tables first
+  db.run(sql`CREATE TABLE IF NOT EXISTS tenants (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    slug TEXT NOT NULL UNIQUE,
+    owner_email TEXT NOT NULL,
+    plan TEXT NOT NULL DEFAULT 'free',
+    status TEXT NOT NULL DEFAULT 'trial',
+    created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+    updated_at INTEGER NOT NULL DEFAULT (unixepoch())
+  )`);
+
+  db.run(sql`CREATE TABLE IF NOT EXISTS users (
+    id TEXT PRIMARY KEY,
+    email TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    name TEXT NOT NULL,
+    email_verified INTEGER NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+    updated_at INTEGER NOT NULL DEFAULT (unixepoch())
+  )`);
+
+  db.run(sql`CREATE TABLE IF NOT EXISTS memberships (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    tenant_id TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    role TEXT NOT NULL DEFAULT 'viewer',
+    created_at INTEGER NOT NULL DEFAULT (unixepoch())
+  )`);
+
   // Create tables if they don't exist (inline migration for simplicity)
   db.run(sql`CREATE TABLE IF NOT EXISTS vaults (
     id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
     address TEXT NOT NULL,
     chain TEXT NOT NULL,
@@ -230,6 +261,7 @@ async function initDatabase() {
 
   db.run(sql`CREATE TABLE IF NOT EXISTS events (
     id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     vault_id TEXT NOT NULL REFERENCES vaults(id),
     type TEXT NOT NULL,
     tx_hash TEXT NOT NULL,
@@ -244,6 +276,7 @@ async function initDatabase() {
 
   db.run(sql`CREATE TABLE IF NOT EXISTS threats (
     id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     vault_id TEXT NOT NULL REFERENCES vaults(id),
     event_id TEXT REFERENCES events(id),
     type TEXT NOT NULL,
@@ -262,6 +295,7 @@ async function initDatabase() {
 
   db.run(sql`CREATE TABLE IF NOT EXISTS alert_rules (
     id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
     type TEXT NOT NULL,
     enabled INTEGER NOT NULL DEFAULT 1,
@@ -273,6 +307,7 @@ async function initDatabase() {
 
   db.run(sql`CREATE TABLE IF NOT EXISTS integrations (
     id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     type TEXT NOT NULL,
     name TEXT NOT NULL,
     webhook_url TEXT,
