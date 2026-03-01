@@ -69,8 +69,8 @@ export default function SignupPage() {
     <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-12 h-12 bg-purple-600/10 border border-purple-500/20 rounded-xl mb-4">
-            <Shield className="w-6 h-6 text-purple-500" />
+          <div className="inline-flex items-center justify-center w-12 h-12 bg-emerald-600/10 border border-emerald-500/20 rounded-xl mb-4">
+            <Shield className="w-6 h-6 text-emerald-500" />
           </div>
           <h1 className="text-2xl font-bold text-white mb-1">Get started</h1>
           <p className="text-sm text-slate-400">
@@ -181,7 +181,7 @@ export default function SignupPage() {
                 </span>
                 <Link
                   href="/login"
-                  className="text-purple-400 hover:text-purple-300 font-medium"
+                  className="text-emerald-400 hover:text-emerald-300 font-medium"
                 >
                   Sign in
                 </Link>
