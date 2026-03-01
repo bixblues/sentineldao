@@ -19,6 +19,7 @@ import workflowsRoutes from "./routes/workflows.js";
 
 // Security middleware
 import { apiKeyAuth } from "./middleware/auth.js";
+import { requireAuth } from "./middleware/tenant-auth.js";
 import {
   generalRateLimit,
   writeRateLimit,
@@ -66,9 +67,12 @@ app.use(
 app.route("/api/auth", authRoutes);
 
 // Security: API key auth (disabled in dev if no API_KEYS env set)
-// Skip auth for /api/auth/* routes
+// Skip auth for /api/auth/* and /api/webhooks/* routes
 app.use("/api/*", async (c, next) => {
-  if (c.req.path.startsWith("/api/auth/")) {
+  if (
+    c.req.path.startsWith("/api/auth/") ||
+    c.req.path.startsWith("/api/webhooks/")
+  ) {
     return next();
   }
   return apiKeyAuth(c, next);
@@ -84,7 +88,20 @@ app.use("/api/vaults/ccip/*", defenseRateLimit);
 // Audit logging for all mutating operations
 app.use("/api/*", auditLog);
 
-// ─── Protected Routes (require auth) ───────────────────────────────
+// Tenant authentication (JWT-based) for all protected routes
+// Skip for /api/auth/*, /api/webhooks/*, /api/health
+app.use("/api/*", async (c, next) => {
+  if (
+    c.req.path.startsWith("/api/auth/") ||
+    c.req.path.startsWith("/api/webhooks/") ||
+    c.req.path === "/api/health"
+  ) {
+    return next();
+  }
+  return requireAuth(c, next);
+});
+
+// ─── Protected Routes (require tenant auth) ────────────────────────
 app.route("/api/vaults", vaultsRoutes);
 app.route("/api/threats", threatsRoutes);
 app.route("/api/events", eventsRoutes);

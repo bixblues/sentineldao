@@ -145,12 +145,13 @@ async function handleCREWebhook(
     fromAddress = data.triggeredBy || null;
   }
 
-  // Create event record in database
+  // Create event record in database (with tenantId from vault)
   const eventType = mapEventType(event);
   const amountEth = data.amountEth ? Number(data.amountEth) : null;
 
   const eventRecord = {
     id: randomUUID(),
+    tenantId: vaultRecord.tenantId,
     vaultId: vaultRecord.id,
     type: eventType,
     txHash: data.txHash,
@@ -250,6 +251,7 @@ async function handleLegacyWebhook(c: any, body: any) {
   if (triggerData) {
     const eventRecord = {
       id: randomUUID(),
+      tenantId: vaultRecord.tenantId,
       vaultId: vaultRecord.id,
       type: "deposit" as const,
       txHash: triggerData.txHash || "",

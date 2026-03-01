@@ -8,6 +8,7 @@ import { randomUUID } from "crypto";
 
 type EventRecord = {
   id: string;
+  tenantId: string;
   vaultId: string;
   type: string;
   txHash: string;
@@ -20,6 +21,7 @@ type EventRecord = {
 };
 
 type ThreatResult = {
+  tenantId: string;
   vaultId: string;
   eventId: string;
   type: string;
@@ -64,6 +66,7 @@ class ThreatEngine {
     // This is the primary detection path — CRE DON consensus-verified.
     if (creHints?.creSeverity && creHints.creSeverity !== "info") {
       const creThreat: ThreatResult = {
+        tenantId: event.tenantId,
         vaultId,
         eventId: event.id,
         type: this.formatCREThreatType(creHints.creThreatType || "unknown"),
@@ -189,6 +192,7 @@ class ThreatEngine {
 
           const severity = depositAmt >= 0.5 ? "critical" : "high";
           const threat: ThreatResult = {
+            tenantId: event.tenantId,
             vaultId,
             eventId: event.id,
             type: "Flash Loan Attack Pattern",
@@ -251,6 +255,7 @@ class ThreatEngine {
               ? "high"
               : "medium";
         const threat: ThreatResult = {
+          tenantId: event.tenantId,
           vaultId,
           eventId: event.id,
           type: "TVL Drain Detected",
@@ -290,6 +295,7 @@ class ThreatEngine {
 
       const types = [...new Set(recentThreats.map((t) => t.type))];
       const threat: ThreatResult = {
+        tenantId: recentThreats[0].tenantId,
         vaultId,
         eventId: recentThreats[0].eventId || "",
         type: "Correlated Multi-Vector Attack",
@@ -326,6 +332,7 @@ class ThreatEngine {
           if (isDuplicate(dedupKey)) return null;
 
           return {
+            tenantId: event.tenantId,
             vaultId,
             eventId: event.id,
             type: "Unusual Large Transfer",
@@ -358,6 +365,7 @@ class ThreatEngine {
           if (isDuplicate(dedupKey)) return null;
 
           return {
+            tenantId: event.tenantId,
             vaultId,
             eventId: event.id,
             type: "Anomalous Rapid Transactions",
@@ -383,6 +391,7 @@ class ThreatEngine {
           });
 
           return {
+            tenantId: event.tenantId,
             vaultId,
             eventId: event.id,
             type: "Emergency Pause Detected",
@@ -420,6 +429,7 @@ class ThreatEngine {
 
     const threatRecord = {
       id: randomUUID(),
+      tenantId: threat.tenantId,
       vaultId: threat.vaultId,
       eventId: threat.eventId,
       type: threat.type,
