@@ -4,7 +4,7 @@
   "private": true,
   "description": "Autonomous Cross-Chain Protocol Defense System",
   "scripts": {
-    "dev": "pnpm --filter @sentineldao/dashboard dev",
+    "dev:dashboard": "pnpm --filter @sentineldao/dashboard dev",
     "dev:api": "cd apps/api && bun run dev",
     "dev:all": "cd apps/api && bun run dev & pnpm --filter @sentineldao/dashboard dev",
     "build": "pnpm -r build",
