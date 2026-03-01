@@ -1,8 +1,63 @@
 import { sqliteTable, text, integer, real } from "drizzle-orm/sqlite-core";
 
+// ─── Tenants (Organizations) ────────────────────────────────────────
+export const tenants = sqliteTable("tenants", {
+  id: text("id").primaryKey(), // uuid
+  name: text("name").notNull(),
+  slug: text("slug").notNull().unique(), // URL-friendly identifier
+  ownerEmail: text("owner_email").notNull(),
+  plan: text("plan", { enum: ["free", "pro", "enterprise"] })
+    .notNull()
+    .default("free"),
+  status: text("status", { enum: ["active", "suspended", "trial"] })
+    .notNull()
+    .default("trial"),
+  createdAt: integer("created_at", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+  updatedAt: integer("updated_at", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+});
+
+// ─── Users ──────────────────────────────────────────────────────────
+export const users = sqliteTable("users", {
+  id: text("id").primaryKey(), // uuid
+  email: text("email").notNull().unique(),
+  passwordHash: text("password_hash").notNull(),
+  name: text("name"),
+  emailVerified: integer("email_verified", { mode: "boolean" })
+    .notNull()
+    .default(false),
+  createdAt: integer("created_at", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+  lastLoginAt: integer("last_login_at", { mode: "timestamp" }),
+});
+
+// ─── Memberships (Users ↔ Tenants) ─────────────────────────────────
+export const memberships = sqliteTable("memberships", {
+  id: text("id").primaryKey(), // uuid
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  tenantId: text("tenant_id")
+    .notNull()
+    .references(() => tenants.id, { onDelete: "cascade" }),
+  role: text("role", { enum: ["owner", "admin", "operator", "viewer"] })
+    .notNull()
+    .default("viewer"),
+  createdAt: integer("created_at", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+});
+
 // ─── Vaults ──────────────────────────────────────────────────────────
 export const vaults = sqliteTable("vaults", {
   id: text("id").primaryKey(), // uuid
+  tenantId: text("tenant_id")
+    .notNull()
+    .references(() => tenants.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   address: text("address").notNull(),
   chain: text("chain").notNull(), // e.g. "ethereum-sepolia"
@@ -22,6 +77,9 @@ export const vaults = sqliteTable("vaults", {
 // ─── Activity Log (on-chain events) ─────────────────────────────────
 export const events = sqliteTable("events", {
   id: text("id").primaryKey(),
+  tenantId: text("tenant_id")
+    .notNull()
+    .references(() => tenants.id, { onDelete: "cascade" }),
   vaultId: text("vault_id")
     .notNull()
     .references(() => vaults.id),
@@ -43,6 +101,9 @@ export const events = sqliteTable("events", {
 // ─── Threat Events ──────────────────────────────────────────────────
 export const threats = sqliteTable("threats", {
   id: text("id").primaryKey(),
+  tenantId: text("tenant_id")
+    .notNull()
+    .references(() => tenants.id, { onDelete: "cascade" }),
   vaultId: text("vault_id")
     .notNull()
     .references(() => vaults.id),
@@ -72,6 +133,9 @@ export const threats = sqliteTable("threats", {
 // ─── Alert Rules ────────────────────────────────────────────────────
 export const alertRules = sqliteTable("alert_rules", {
   id: text("id").primaryKey(),
+  tenantId: text("tenant_id")
+    .notNull()
+    .references(() => tenants.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   type: text("type", {
     enum: [
@@ -107,6 +171,9 @@ export const alertRules = sqliteTable("alert_rules", {
 // ─── Integrations ───────────────────────────────────────────────────
 export const integrations = sqliteTable("integrations", {
   id: text("id").primaryKey(),
+  tenantId: text("tenant_id")
+    .notNull()
+    .references(() => tenants.id, { onDelete: "cascade" }),
   type: text("type", {
     enum: ["slack", "discord", "pagerduty", "telegram", "custom_webhook"],
   }).notNull(),
@@ -133,6 +200,12 @@ export const settings = sqliteTable("settings", {
 });
 
 // ─── Type exports ───────────────────────────────────────────────────
+export type Tenant = typeof tenants.$inferSelect;
+export type NewTenant = typeof tenants.$inferInsert;
+export type User = typeof users.$inferSelect;
+export type NewUser = typeof users.$inferInsert;
+export type Membership = typeof memberships.$inferSelect;
+export type NewMembership = typeof memberships.$inferInsert;
 export type Vault = typeof vaults.$inferSelect;
 export type NewVault = typeof vaults.$inferInsert;
 export type Event = typeof events.$inferSelect;

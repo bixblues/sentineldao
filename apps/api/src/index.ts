@@ -8,6 +8,7 @@ import { wsManager } from "./lib/ws.js";
 import { randomUUID } from "crypto";
 
 // Route imports
+import authRoutes from "./routes/auth.js";
 import vaultsRoutes from "./routes/vaults.js";
 import threatsRoutes from "./routes/threats.js";
 import eventsRoutes from "./routes/events.js";
@@ -53,8 +54,17 @@ app.use(
   }),
 );
 
+// ─── Public Routes (no auth required) ──────────────────────────────
+app.route("/api/auth", authRoutes);
+
 // Security: API key auth (disabled in dev if no API_KEYS env set)
-app.use("/api/*", apiKeyAuth);
+// Skip auth for /api/auth/* routes
+app.use("/api/*", async (c, next) => {
+  if (c.req.path.startsWith("/api/auth/")) {
+    return next();
+  }
+  return apiKeyAuth(c, next);
+});
 
 // Rate limiting
 app.use("/api/*", generalRateLimit);
@@ -66,7 +76,7 @@ app.use("/api/vaults/ccip/*", defenseRateLimit);
 // Audit logging for all mutating operations
 app.use("/api/*", auditLog);
 
-// ─── Routes ─────────────────────────────────────────────────────────
+// ─── Protected Routes (require auth) ───────────────────────────────
 app.route("/api/vaults", vaultsRoutes);
 app.route("/api/threats", threatsRoutes);
 app.route("/api/events", eventsRoutes);
