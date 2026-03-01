@@ -2,9 +2,10 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { db } from "../db/index.js";
 import { settings, alertRules, integrations } from "../db/schema.js";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { testWebhook } from "../services/notifications.js";
 import { randomUUID } from "crypto";
+import { getTenantContext } from "../middleware/tenant-auth.js";
 
 const app = new Hono();
 
@@ -40,38 +41,59 @@ app.put("/:key", async (c) => {
 
 const alertRuleSchema = z.object({
   name: z.string().min(1),
-  type: z.enum(["large_transfer", "rapid_transactions", "unauthorized_access", "custom"]),
+  type: z.enum([
+    "large_transfer",
+    "rapid_transactions",
+    "unauthorized_access",
+    "custom",
+  ]),
   enabled: z.boolean().optional().default(true),
   params: z.record(z.unknown()).optional(),
-  severity: z.enum(["critical", "high", "medium", "low"]).optional().default("medium"),
-  responseType: z.enum(["alert_only", "pause_single", "pause_all_ccip"]).optional().default("alert_only"),
+  severity: z
+    .enum(["critical", "high", "medium", "low"])
+    .optional()
+    .default("medium"),
+  responseType: z
+    .enum(["alert_only", "pause_single", "pause_all_ccip"])
+    .optional()
+    .default("alert_only"),
 });
 
 // GET /api/settings/rules
 app.get("/rules", async (c) => {
-  const rules = await db.query.alertRules.findMany();
+  const { tenantId } = getTenantContext(c);
+  const rules = await db.query.alertRules.findMany({
+    where: eq(alertRules.tenantId, tenantId),
+  });
   return c.json({ rules });
 });
 
 // POST /api/settings/rules
 app.post("/rules", async (c) => {
+  const { tenantId } = getTenantContext(c);
   const body = await c.req.json();
   const parsed = alertRuleSchema.safeParse(body);
   if (!parsed.success) {
-    return c.json({ error: "Validation failed", details: parsed.error.flatten() }, 400);
+    return c.json(
+      { error: "Validation failed", details: parsed.error.flatten() },
+      400,
+    );
   }
 
-  const rule = { id: randomUUID(), ...parsed.data };
+  const rule = { id: randomUUID(), tenantId, ...parsed.data };
   await db.insert(alertRules).values(rule);
   return c.json({ rule }, 201);
 });
 
 // PATCH /api/settings/rules/:id
 app.patch("/rules/:id", async (c) => {
+  const { tenantId } = getTenantContext(c);
   const id = c.req.param("id");
   const body = await c.req.json();
 
-  const existing = await db.query.alertRules.findFirst({ where: eq(alertRules.id, id) });
+  const existing = await db.query.alertRules.findFirst({
+    where: and(eq(alertRules.id, id), eq(alertRules.tenantId, tenantId)),
+  });
   if (!existing) return c.json({ error: "Rule not found" }, 404);
 
   await db.update(alertRules).set(body).where(eq(alertRules.id, id));
@@ -97,29 +119,39 @@ const integrationSchema = z.object({
 
 // GET /api/settings/integrations
 app.get("/integrations", async (c) => {
-  const all = await db.query.integrations.findMany();
+  const { tenantId } = getTenantContext(c);
+  const all = await db.query.integrations.findMany({
+    where: eq(integrations.tenantId, tenantId),
+  });
   return c.json({ integrations: all });
 });
 
 // POST /api/settings/integrations
 app.post("/integrations", async (c) => {
+  const { tenantId } = getTenantContext(c);
   const body = await c.req.json();
   const parsed = integrationSchema.safeParse(body);
   if (!parsed.success) {
-    return c.json({ error: "Validation failed", details: parsed.error.flatten() }, 400);
+    return c.json(
+      { error: "Validation failed", details: parsed.error.flatten() },
+      400,
+    );
   }
 
-  const integration = { id: randomUUID(), ...parsed.data };
+  const integration = { id: randomUUID(), tenantId, ...parsed.data };
   await db.insert(integrations).values(integration);
   return c.json({ integration }, 201);
 });
 
 // PATCH /api/settings/integrations/:id
 app.patch("/integrations/:id", async (c) => {
+  const { tenantId } = getTenantContext(c);
   const id = c.req.param("id");
   const body = await c.req.json();
 
-  const existing = await db.query.integrations.findFirst({ where: eq(integrations.id, id) });
+  const existing = await db.query.integrations.findFirst({
+    where: and(eq(integrations.id, id), eq(integrations.tenantId, tenantId)),
+  });
   if (!existing) return c.json({ error: "Integration not found" }, 404);
 
   await db.update(integrations).set(body).where(eq(integrations.id, id));
@@ -135,9 +167,12 @@ app.delete("/integrations/:id", async (c) => {
 // POST /api/settings/integrations/:id/test — test a webhook
 app.post("/integrations/:id/test", async (c) => {
   const id = c.req.param("id");
-  const integration = await db.query.integrations.findFirst({ where: eq(integrations.id, id) });
+  const integration = await db.query.integrations.findFirst({
+    where: eq(integrations.id, id),
+  });
   if (!integration) return c.json({ error: "Integration not found" }, 404);
-  if (!integration.webhookUrl) return c.json({ error: "No webhook URL configured" }, 400);
+  if (!integration.webhookUrl)
+    return c.json({ error: "No webhook URL configured" }, 400);
 
   const success = await testWebhook(integration.type, integration.webhookUrl);
   return c.json({ success });

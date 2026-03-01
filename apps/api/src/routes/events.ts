@@ -2,16 +2,19 @@ import { Hono } from "hono";
 import { db } from "../db/index.js";
 import { events } from "../db/schema.js";
 import { eq, desc } from "drizzle-orm";
+import { getTenantContext } from "../middleware/tenant-auth.js";
 
 const app = new Hono();
 
 // GET /api/events — list all events
 app.get("/", async (c) => {
+  const { tenantId } = getTenantContext(c);
   const vaultId = c.req.query("vaultId");
   const type = c.req.query("type");
   const limit = Number(c.req.query("limit") || 100);
 
   let allEvents = await db.query.events.findMany({
+    where: eq(events.tenantId, tenantId),
     orderBy: [desc(events.timestamp)],
     limit,
   });
@@ -28,7 +31,10 @@ app.get("/", async (c) => {
 
 // GET /api/events/stats — event statistics
 app.get("/stats", async (c) => {
-  const allEvents = await db.query.events.findMany();
+  const { tenantId } = getTenantContext(c);
+  const allEvents = await db.query.events.findMany({
+    where: eq(events.tenantId, tenantId),
+  });
 
   const now = Date.now();
   const oneDayAgo = now - 86_400_000;

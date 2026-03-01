@@ -2,11 +2,12 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { db } from "../db/index.js";
 import { vaults } from "../db/schema.js";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { getVaultOnChainData } from "../services/chain-reader.js";
 import { defenseExecutor } from "../services/defense-executor.js";
 import { wsManager } from "../lib/ws.js";
 import { randomUUID } from "crypto";
+import { getTenantContext } from "../middleware/tenant-auth.js";
 
 const app = new Hono();
 
@@ -20,7 +21,10 @@ const createVaultSchema = z.object({
 
 // GET /api/vaults — list all vaults with on-chain data
 app.get("/", async (c) => {
+  const { tenantId } = getTenantContext(c);
+
   const allVaults = await db.query.vaults.findMany({
+    where: eq(vaults.tenantId, tenantId),
     orderBy: (v, { desc }) => [desc(v.createdAt)],
   });
 
@@ -49,8 +53,10 @@ app.get("/", async (c) => {
 
 // GET /api/vaults/:id — single vault detail
 app.get("/:id", async (c) => {
+  const { tenantId } = getTenantContext(c);
+
   const vault = await db.query.vaults.findFirst({
-    where: eq(vaults.id, c.req.param("id")),
+    where: and(eq(vaults.id, c.req.param("id")), eq(vaults.tenantId, tenantId)),
   });
 
   if (!vault) return c.json({ error: "Vault not found" }, 404);
@@ -76,6 +82,7 @@ app.get("/:id", async (c) => {
 
 // POST /api/vaults — register a new vault
 app.post("/", async (c) => {
+  const { tenantId } = getTenantContext(c);
   const body = await c.req.json();
   const parsed = createVaultSchema.safeParse(body);
 
@@ -88,9 +95,12 @@ app.post("/", async (c) => {
 
   const { name, address, chain, chainId, alertThresholdEth } = parsed.data;
 
-  // Check for duplicate
+  // Check for duplicate within tenant
   const existing = await db.query.vaults.findFirst({
-    where: eq(vaults.address, address.toLowerCase()),
+    where: and(
+      eq(vaults.address, address.toLowerCase()),
+      eq(vaults.tenantId, tenantId),
+    ),
   });
 
   if (existing) {
@@ -99,6 +109,7 @@ app.post("/", async (c) => {
 
   const vault = {
     id: randomUUID(),
+    tenantId,
     name,
     address: address.toLowerCase(),
     chain,
@@ -114,10 +125,13 @@ app.post("/", async (c) => {
 
 // PATCH /api/vaults/:id — update vault
 app.patch("/:id", async (c) => {
+  const { tenantId } = getTenantContext(c);
   const id = c.req.param("id");
   const body = await c.req.json();
 
-  const vault = await db.query.vaults.findFirst({ where: eq(vaults.id, id) });
+  const vault = await db.query.vaults.findFirst({
+    where: and(eq(vaults.id, id), eq(vaults.tenantId, tenantId)),
+  });
   if (!vault) return c.json({ error: "Vault not found" }, 404);
 
   const updates: Partial<typeof vault> = {};
@@ -136,8 +150,11 @@ app.patch("/:id", async (c) => {
 
 // POST /api/vaults/:id/pause — emergency pause a vault on-chain
 app.post("/:id/pause", async (c) => {
+  const { tenantId } = getTenantContext(c);
   const id = c.req.param("id");
-  const vault = await db.query.vaults.findFirst({ where: eq(vaults.id, id) });
+  const vault = await db.query.vaults.findFirst({
+    where: and(eq(vaults.id, id), eq(vaults.tenantId, tenantId)),
+  });
   if (!vault) return c.json({ error: "Vault not found" }, 404);
 
   if (!defenseExecutor.isConfigured) {
@@ -173,8 +190,11 @@ app.post("/:id/pause", async (c) => {
 
 // POST /api/vaults/:id/unpause — unpause a vault on-chain
 app.post("/:id/unpause", async (c) => {
+  const { tenantId } = getTenantContext(c);
   const id = c.req.param("id");
-  const vault = await db.query.vaults.findFirst({ where: eq(vaults.id, id) });
+  const vault = await db.query.vaults.findFirst({
+    where: and(eq(vaults.id, id), eq(vaults.tenantId, tenantId)),
+  });
   if (!vault) return c.json({ error: "Vault not found" }, 404);
 
   if (!defenseExecutor.isConfigured) {
