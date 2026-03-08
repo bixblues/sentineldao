@@ -15,6 +15,13 @@
       "when": 1772967465959,
       "tag": "0001_worthless_eddie_brock",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1772984326734,
+      "tag": "0002_plain_the_santerians",
+      "breakpoints": true
     }
   ]
 }

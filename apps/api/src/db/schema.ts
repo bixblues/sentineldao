@@ -25,6 +25,10 @@ export const tenants = pgTable("tenants", {
   ccipReceiverArbitrum: text("ccip_receiver_arbitrum"), // Arbitrum Sepolia receiver
   ccipReceiverBase: text("ccip_receiver_base"), // Base Sepolia receiver
   ccipEnabled: boolean("ccip_enabled").notNull().default(false),
+  // Onboarding state
+  onboardingCompleted: boolean("onboarding_completed").notNull().default(false),
+  onboardingStep: text("onboarding_step").default("welcome"), // welcome, connect_wallet, deploy_vaults, setup_ccip, complete
+  walletAddress: text("wallet_address"), // Connected wallet address
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

@@ -187,6 +187,8 @@ export const authService = {
       ownerEmail: email.toLowerCase(),
       plan: "free" as const,
       status: "trial" as const,
+      onboardingCompleted: false,
+      onboardingStep: "welcome",
       createdAt: new Date(),
       updatedAt: new Date(),
     };

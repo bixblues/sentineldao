@@ -16,6 +16,7 @@ import settingsRoutes from "./routes/settings.js";
 import webhooksRoutes from "./routes/webhooks.js";
 import simulateRoutes from "./routes/simulate.js";
 import workflowsRoutes from "./routes/workflows.js";
+import onboardingRoutes from "./routes/onboarding.js";
 
 // Security middleware
 import { apiKeyAuth } from "./middleware/auth.js";
@@ -111,6 +112,7 @@ app.route("/api/settings", settingsRoutes);
 app.route("/api/webhooks", webhooksRoutes);
 app.route("/api/simulate", simulateRoutes);
 app.route("/api/workflows", workflowsRoutes);
+app.route("/api/onboarding", onboardingRoutes);
 
 // ─── Health ─────────────────────────────────────────────────────────
 const startedAt = Date.now();

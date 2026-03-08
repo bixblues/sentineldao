@@ -368,6 +368,56 @@ export const api = {
       method: "PUT",
       body: JSON.stringify(data),
     }),
+
+  // Onboarding
+  getOnboardingStatus: () =>
+    apiFetch<{
+      onboardingCompleted: boolean;
+      onboardingStep: string;
+      walletAddress: string | null;
+      vaultCount: number;
+      ccipConfigured: boolean;
+      ccipSenderAddress: string | null;
+      ccipReceiverArbitrum: string | null;
+      ccipReceiverBase: string | null;
+    }>("/api/onboarding/status"),
+
+  updateOnboardingStep: (data: { step: string; walletAddress?: string }) =>
+    apiFetch<{ success: boolean; step: string }>("/api/onboarding/step", {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+
+  skipOnboarding: () =>
+    apiFetch<{ success: boolean }>("/api/onboarding/skip", {
+      method: "POST",
+    }),
+
+  registerVault: (data: {
+    name: string;
+    address: string;
+    chain: string;
+    chainId: number;
+    txHash?: string;
+  }) =>
+    apiFetch<{ success: boolean; vault: any }>(
+      "/api/onboarding/register-vault",
+      {
+        method: "POST",
+        body: JSON.stringify(data),
+      },
+    ),
+
+  registerCCIP: (data: {
+    senderAddress?: string;
+    receiverArbitrum?: string;
+    receiverBase?: string;
+    enabled?: boolean;
+  }) =>
+    apiFetch<{ success: boolean; ccip: any }>("/api/onboarding/register-ccip", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
 };
 
 // ─── WebSocket ──────────────────────────────────────────────────────
