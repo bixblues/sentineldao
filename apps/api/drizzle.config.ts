@@ -3,8 +3,10 @@ import { defineConfig } from "drizzle-kit";
 export default defineConfig({
   schema: "./src/db/schema.ts",
   out: "./drizzle",
-  dialect: "sqlite",
+  dialect: "postgresql",
   dbCredentials: {
-    url: "./data/sentinel.db",
+    url:
+      process.env.DATABASE_URL ||
+      "postgresql://sentineldao:sentineldao_dev_password@localhost:5432/sentineldao",
   },
 });

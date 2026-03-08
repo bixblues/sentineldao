@@ -1,7 +1,15 @@
-import { sqliteTable, text, integer, real } from "drizzle-orm/sqlite-core";
+import {
+  pgTable,
+  text,
+  timestamp,
+  boolean,
+  doublePrecision,
+  integer,
+  jsonb,
+} from "drizzle-orm/pg-core";
 
 // ─── Tenants (Organizations) ────────────────────────────────────────
-export const tenants = sqliteTable("tenants", {
+export const tenants = pgTable("tenants", {
   id: text("id").primaryKey(), // uuid
   name: text("name").notNull(),
   slug: text("slug").notNull().unique(), // URL-friendly identifier
@@ -12,31 +20,23 @@ export const tenants = sqliteTable("tenants", {
   status: text("status", { enum: ["active", "suspended", "trial"] })
     .notNull()
     .default("trial"),
-  createdAt: integer("created_at", { mode: "timestamp" })
-    .notNull()
-    .$defaultFn(() => new Date()),
-  updatedAt: integer("updated_at", { mode: "timestamp" })
-    .notNull()
-    .$defaultFn(() => new Date()),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
 // ─── Users ──────────────────────────────────────────────────────────
-export const users = sqliteTable("users", {
+export const users = pgTable("users", {
   id: text("id").primaryKey(), // uuid
   email: text("email").notNull().unique(),
   passwordHash: text("password_hash").notNull(),
   name: text("name"),
-  emailVerified: integer("email_verified", { mode: "boolean" })
-    .notNull()
-    .default(false),
-  createdAt: integer("created_at", { mode: "timestamp" })
-    .notNull()
-    .$defaultFn(() => new Date()),
-  lastLoginAt: integer("last_login_at", { mode: "timestamp" }),
+  emailVerified: boolean("email_verified").notNull().default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  lastLoginAt: timestamp("last_login_at"),
 });
 
 // ─── Memberships (Users ↔ Tenants) ─────────────────────────────────
-export const memberships = sqliteTable("memberships", {
+export const memberships = pgTable("memberships", {
   id: text("id").primaryKey(), // uuid
   userId: text("user_id")
     .notNull()
@@ -47,13 +47,11 @@ export const memberships = sqliteTable("memberships", {
   role: text("role", { enum: ["owner", "admin", "operator", "viewer"] })
     .notNull()
     .default("viewer"),
-  createdAt: integer("created_at", { mode: "timestamp" })
-    .notNull()
-    .$defaultFn(() => new Date()),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
 // ─── Vaults ──────────────────────────────────────────────────────────
-export const vaults = sqliteTable("vaults", {
+export const vaults = pgTable("vaults", {
   id: text("id").primaryKey(), // uuid
   tenantId: text("tenant_id")
     .notNull()
@@ -65,17 +63,15 @@ export const vaults = sqliteTable("vaults", {
   status: text("status", { enum: ["monitoring", "paused", "pending"] })
     .notNull()
     .default("monitoring"),
-  alertThresholdEth: real("alert_threshold_eth").notNull().default(0.1),
-  createdAt: integer("created_at", { mode: "timestamp" })
+  alertThresholdEth: doublePrecision("alert_threshold_eth")
     .notNull()
-    .$defaultFn(() => new Date()),
-  updatedAt: integer("updated_at", { mode: "timestamp" })
-    .notNull()
-    .$defaultFn(() => new Date()),
+    .default(0.1),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
 // ─── Activity Log (on-chain events) ─────────────────────────────────
-export const events = sqliteTable("events", {
+export const events = pgTable("events", {
   id: text("id").primaryKey(),
   tenantId: text("tenant_id")
     .notNull()
@@ -91,15 +87,13 @@ export const events = sqliteTable("events", {
   fromAddress: text("from_address"),
   toAddress: text("to_address"),
   amount: text("amount"), // wei string
-  amountEth: real("amount_eth"), // parsed ETH value
+  amountEth: doublePrecision("amount_eth"), // parsed ETH value
   chain: text("chain").notNull(),
-  timestamp: integer("timestamp", { mode: "timestamp" })
-    .notNull()
-    .$defaultFn(() => new Date()),
+  timestamp: timestamp("timestamp").notNull().defaultNow(),
 });
 
 // ─── Threat Events ──────────────────────────────────────────────────
-export const threats = sqliteTable("threats", {
+export const threats = pgTable("threats", {
   id: text("id").primaryKey(),
   tenantId: text("tenant_id")
     .notNull()
@@ -116,7 +110,7 @@ export const threats = sqliteTable("threats", {
   chain: text("chain").notNull(),
   txHash: text("tx_hash"),
   amount: text("amount"),
-  amountEth: real("amount_eth"),
+  amountEth: doublePrecision("amount_eth"),
   responseAction: text("response_action"), // what was done
   responseStatus: text("response_status", {
     enum: ["pending", "executed", "dismissed", "failed"],
@@ -124,14 +118,12 @@ export const threats = sqliteTable("threats", {
     .notNull()
     .default("pending"),
   responseTxHash: text("response_tx_hash"), // tx of the defense action
-  detectedAt: integer("detected_at", { mode: "timestamp" })
-    .notNull()
-    .$defaultFn(() => new Date()),
-  resolvedAt: integer("resolved_at", { mode: "timestamp" }),
+  detectedAt: timestamp("detected_at").notNull().defaultNow(),
+  resolvedAt: timestamp("resolved_at"),
 });
 
 // ─── Alert Rules ────────────────────────────────────────────────────
-export const alertRules = sqliteTable("alert_rules", {
+export const alertRules = pgTable("alert_rules", {
   id: text("id").primaryKey(),
   tenantId: text("tenant_id")
     .notNull()
@@ -145,9 +137,9 @@ export const alertRules = sqliteTable("alert_rules", {
       "custom",
     ],
   }).notNull(),
-  enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
+  enabled: boolean("enabled").notNull().default(true),
   // Rule parameters (JSON)
-  params: text("params", { mode: "json" }).$type<{
+  params: jsonb("params").$type<{
     thresholdEth?: number;
     maxTxnsPerMinute?: number;
     monitoredFunctions?: string[];
@@ -163,13 +155,11 @@ export const alertRules = sqliteTable("alert_rules", {
   })
     .notNull()
     .default("alert_only"),
-  createdAt: integer("created_at", { mode: "timestamp" })
-    .notNull()
-    .$defaultFn(() => new Date()),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
 // ─── Integrations ───────────────────────────────────────────────────
-export const integrations = sqliteTable("integrations", {
+export const integrations = pgTable("integrations", {
   id: text("id").primaryKey(),
   tenantId: text("tenant_id")
     .notNull()
@@ -180,23 +170,19 @@ export const integrations = sqliteTable("integrations", {
   name: text("name").notNull(),
   webhookUrl: text("webhook_url"),
   apiKey: text("api_key"),
-  enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
+  enabled: boolean("enabled").notNull().default(true),
   // Which severities trigger this integration
-  severities: text("severities", { mode: "json" })
+  severities: jsonb("severities")
     .$type<string[]>()
     .default(["critical", "high"]),
-  createdAt: integer("created_at", { mode: "timestamp" })
-    .notNull()
-    .$defaultFn(() => new Date()),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
 // ─── Global Settings ────────────────────────────────────────────────
-export const settings = sqliteTable("settings", {
+export const settings = pgTable("settings", {
   key: text("key").primaryKey(),
-  value: text("value", { mode: "json" }).$type<unknown>(),
-  updatedAt: integer("updated_at", { mode: "timestamp" })
-    .notNull()
-    .$defaultFn(() => new Date()),
+  value: jsonb("value").$type<unknown>(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
 // ─── Type exports ───────────────────────────────────────────────────
