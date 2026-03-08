@@ -296,12 +296,6 @@ sentineldao/
 
 [📹 Watch 5-minute demo](https://youtu.be/your-video-link)
 
-## 🏆 Hackathon Submission
-
-**Chainlink Convergence Hackathon**
-- **Track:** Risk and Compliance
-- **Chainlink Products:** CRE + CCIP
-- **AI Integration:** Google Gemini LLM
 
 ## 🤝 Contributing
 
@@ -311,18 +305,12 @@ Contributions are welcome! Please open an issue or submit a pull request.
 
 MIT License - see [LICENSE](LICENSE) file for details.
 
-## 🙏 Acknowledgments
-
-- Chainlink team for CRE and CCIP infrastructure
-- Google for Gemini AI API
-- OpenZeppelin for secure contract libraries
-
 ## 📞 Contact
 
 **Krishna Mahato**
 - Email: krishnamahato.of@gmail.com
-- GitHub: [@your-username](https://github.com/your-username)
+- GitHub: [@krishna9304](https://github.com/krishna9304)
 
 ---
 
-Built with ❤️ using Chainlink CRE, CCIP, and AI
+Built with ❤️ by Krishna Mahato

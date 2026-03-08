@@ -4,6 +4,7 @@ import { eq, desc, and, gte } from "drizzle-orm";
 import { wsManager } from "../lib/ws.js";
 import { notifyIntegrations } from "./notifications.js";
 import { defenseExecutor } from "./defense-executor.js";
+import { aiAnalyzer } from "./ai-analyzer.js";
 import { randomUUID } from "crypto";
 
 type EventRecord = {
@@ -441,9 +442,25 @@ class ThreatEngine {
       amountEth: threat.amountEth,
       responseAction,
       responseStatus,
+      // AI fields will be populated asynchronously
+      aiRiskScore: null,
+      aiConfidence: null,
+      aiReasoning: null,
+      aiAttackVector: null,
+      aiRecommendations: null,
     };
 
     await db.insert(threats).values(threatRecord);
+
+    // ── DUAL-PATH DETECTION ──
+    // Path 1: Fast rule-based response (already handled above)
+    // Path 2: Parallel AI analysis for context and false positive reduction
+    if (aiAnalyzer.isConfigured) {
+      // Run AI analysis in background (non-blocking)
+      this.runAIAnalysis(threatRecord.id, threat).catch((err) => {
+        console.error("[ThreatEngine] AI analysis failed:", err.message);
+      });
+    }
 
     console.log(
       `[ThreatEngine] 🚨 ${threat.severity.toUpperCase()}: ${threat.type} on ${threat.chain}`,
@@ -589,6 +606,48 @@ class ThreatEngine {
           );
         }
       }
+    }
+  }
+
+  // ─── AI Analysis (Background) ──────────────────────────────────────
+  private async runAIAnalysis(threatId: string, threat: ThreatResult) {
+    console.log(`[ThreatEngine] Running AI analysis for threat ${threatId}...`);
+
+    const aiResult = await aiAnalyzer.analyzeThreat({
+      type: threat.type,
+      severity: threat.severity,
+      amount: threat.amountEth,
+      chain: threat.chain,
+      eventType: threat.type,
+      description: threat.description,
+    });
+
+    if (aiResult) {
+      // Update threat record with AI insights
+      await db
+        .update(threats)
+        .set({
+          aiRiskScore: aiResult.riskScore,
+          aiConfidence: aiResult.confidence,
+          aiReasoning: aiResult.reasoning,
+          aiAttackVector: aiResult.attackVector,
+          aiRecommendations: aiResult.recommendations,
+        })
+        .where(eq(threats.id, threatId));
+
+      // Broadcast AI analysis update to dashboard
+      wsManager.broadcast("threat_ai_update", {
+        threatId,
+        aiRiskScore: aiResult.riskScore,
+        aiConfidence: aiResult.confidence,
+        aiReasoning: aiResult.reasoning,
+        aiAttackVector: aiResult.attackVector,
+        aiRecommendations: aiResult.recommendations,
+      });
+
+      console.log(
+        `[ThreatEngine] AI analysis complete: Risk=${aiResult.riskScore}/100, Confidence=${aiResult.confidence}%, Vector=${aiResult.attackVector}`,
+      );
     }
   }
 }

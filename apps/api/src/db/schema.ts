@@ -127,6 +127,12 @@ export const threats = pgTable("threats", {
     .notNull()
     .default("pending"),
   responseTxHash: text("response_tx_hash"), // tx of the defense action
+  // AI Analysis fields
+  aiRiskScore: integer("ai_risk_score"), // 0-100
+  aiConfidence: integer("ai_confidence"), // 0-100
+  aiReasoning: text("ai_reasoning"),
+  aiAttackVector: text("ai_attack_vector"),
+  aiRecommendations: jsonb("ai_recommendations").$type<string[]>(),
   detectedAt: timestamp("detected_at").notNull().defaultNow(),
   resolvedAt: timestamp("resolved_at"),
 });
@@ -185,6 +191,17 @@ export const integrations = pgTable("integrations", {
     .$type<string[]>()
     .default(["critical", "high"]),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// ─── Audit Log ──────────────────────────────────────────────────────
+export const auditLog = pgTable("audit_log", {
+  id: text("id").primaryKey(),
+  path: text("path").notNull(),
+  ip: text("ip"),
+  requestBody: jsonb("request_body").$type<Record<string, any>>(),
+  responseStatus: integer("response_status"),
+  durationMs: integer("duration_ms"),
+  timestamp: timestamp("timestamp").notNull().defaultNow(),
 });
 
 // ─── Global Settings ────────────────────────────────────────────────
