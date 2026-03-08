@@ -35,6 +35,7 @@ import {
   useEvents,
   useWebSocket,
 } from "@/lib/hooks";
+import { useAuth } from "@/contexts/auth-context";
 import type { ThreatEvent, ActivityEvent } from "@/lib/api";
 import { api } from "@/lib/api";
 import Link from "next/link";
@@ -299,6 +300,7 @@ function formatUptime(seconds: number): string {
 }
 
 export function OverviewPage() {
+  const { user, tenant } = useAuth();
   const {
     data: overview,
     loading: loadingOverview,
@@ -375,14 +377,25 @@ export function OverviewPage() {
     });
   });
 
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return "Good morning";
+    if (hour < 18) return "Good afternoon";
+    return "Good evening";
+  };
+
   return (
     <div className="space-y-6">
       {/* Page header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Overview</h1>
+          <h1 className="text-2xl font-bold text-foreground">
+            {getGreeting()},{" "}
+            {user?.name || user?.email?.split("@")[0] || "there"}
+          </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Real-time protocol defense across {chainBreakdown.size || 1} chain
+            {tenant?.name} • Real-time protocol defense across{" "}
+            {chainBreakdown.size || 1} chain
             {chainBreakdown.size !== 1 ? "s" : ""}
           </p>
         </div>
