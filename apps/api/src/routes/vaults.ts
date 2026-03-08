@@ -95,16 +95,20 @@ app.post("/", async (c) => {
 
   const { name, address, chain, chainId, alertThresholdEth } = parsed.data;
 
-  // Check for duplicate within tenant
+  // Check for duplicate within tenant on the same chain
   const existing = await db.query.vaults.findFirst({
     where: and(
       eq(vaults.address, address.toLowerCase()),
+      eq(vaults.chain, chain),
       eq(vaults.tenantId, tenantId),
     ),
   });
 
   if (existing) {
-    return c.json({ error: "Vault with this address already exists" }, 409);
+    return c.json(
+      { error: "Vault with this address already exists on this chain" },
+      409,
+    );
   }
 
   const vault = {

@@ -21,6 +21,97 @@ app.get("/", async (c) => {
   return c.json({ settings: map });
 });
 
+// ─── CCIP Configuration (must be before /:key route) ───────────────
+
+const ccipConfigSchema = z.object({
+  ccipSenderAddress: z
+    .string()
+    .optional()
+    .refine(
+      (val) => !val || /^0x[a-fA-F0-9]{40}$/.test(val),
+      "Invalid Ethereum address format",
+    ),
+  ccipReceiverArbitrum: z
+    .string()
+    .optional()
+    .refine(
+      (val) => !val || /^0x[a-fA-F0-9]{40}$/.test(val),
+      "Invalid Ethereum address format",
+    ),
+  ccipReceiverBase: z
+    .string()
+    .optional()
+    .refine(
+      (val) => !val || /^0x[a-fA-F0-9]{40}$/.test(val),
+      "Invalid Ethereum address format",
+    ),
+  ccipEnabled: z.boolean(),
+});
+
+// GET /api/settings/ccip
+app.get("/ccip", async (c) => {
+  const { tenantId } = getTenantContext(c);
+
+  const tenant = await db.query.tenants.findFirst({
+    where: eq(tenants.id, tenantId),
+  });
+
+  if (!tenant) {
+    return c.json({ error: "Tenant not found" }, 404);
+  }
+
+  return c.json({
+    ccipSenderAddress: tenant.ccipSenderAddress,
+    ccipReceiverArbitrum: tenant.ccipReceiverArbitrum,
+    ccipReceiverBase: tenant.ccipReceiverBase,
+    ccipEnabled: tenant.ccipEnabled,
+  });
+});
+
+// PUT /api/settings/ccip
+app.put("/ccip", async (c) => {
+  const { tenantId } = getTenantContext(c);
+  const body = await c.req.json();
+
+  const parsed = ccipConfigSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json(
+      { error: "Validation failed", details: parsed.error.flatten() },
+      400,
+    );
+  }
+
+  try {
+    await db
+      .update(tenants)
+      .set({
+        ccipSenderAddress: parsed.data.ccipSenderAddress || null,
+        ccipReceiverArbitrum: parsed.data.ccipReceiverArbitrum || null,
+        ccipReceiverBase: parsed.data.ccipReceiverBase || null,
+        ccipEnabled: parsed.data.ccipEnabled,
+        updatedAt: new Date(),
+      })
+      .where(eq(tenants.id, tenantId));
+
+    const updatedTenant = await db.query.tenants.findFirst({
+      where: eq(tenants.id, tenantId),
+    });
+
+    return c.json({
+      success: true,
+      config: {
+        ccipSenderAddress: updatedTenant?.ccipSenderAddress,
+        ccipReceiverArbitrum: updatedTenant?.ccipReceiverArbitrum,
+        ccipReceiverBase: updatedTenant?.ccipReceiverBase,
+        ccipEnabled: updatedTenant?.ccipEnabled,
+      },
+    });
+  } catch (error) {
+    console.error("[CCIP Config] Database error:", error);
+    return c.json({ error: "Failed to update CCIP configuration" }, 500);
+  }
+});
+
 // PUT /api/settings/:key
 app.put("/:key", async (c) => {
   const key = c.req.param("key");
@@ -176,74 +267,6 @@ app.post("/integrations/:id/test", async (c) => {
 
   const success = await testWebhook(integration.type, integration.webhookUrl);
   return c.json({ success });
-});
-
-// ─── CCIP Configuration ─────────────────────────────────────────────────
-
-const ccipConfigSchema = z.object({
-  ccipSenderAddress: z
-    .string()
-    .regex(/^0x[a-fA-F0-9]{40}$/)
-    .optional(),
-  ccipReceiverArbitrum: z
-    .string()
-    .regex(/^0x[a-fA-F0-9]{40}$/)
-    .optional(),
-  ccipReceiverBase: z
-    .string()
-    .regex(/^0x[a-fA-F0-9]{40}$/)
-    .optional(),
-  ccipEnabled: z.boolean(),
-});
-
-// GET /api/settings/ccip
-app.get("/ccip", async (c) => {
-  const { tenantId } = getTenantContext(c);
-
-  const tenant = await db.query.tenants.findFirst({
-    where: eq(tenants.id, tenantId),
-  });
-
-  if (!tenant) {
-    return c.json({ error: "Tenant not found" }, 404);
-  }
-
-  return c.json({
-    ccipSenderAddress: tenant.ccipSenderAddress,
-    ccipReceiverArbitrum: tenant.ccipReceiverArbitrum,
-    ccipReceiverBase: tenant.ccipReceiverBase,
-    ccipEnabled: tenant.ccipEnabled,
-  });
-});
-
-// PUT /api/settings/ccip
-app.put("/ccip", async (c) => {
-  const { tenantId } = getTenantContext(c);
-  const body = await c.req.json();
-
-  const parsed = ccipConfigSchema.safeParse(body);
-  if (!parsed.success) {
-    return c.json(
-      { error: "Validation failed", details: parsed.error.flatten() },
-      400,
-    );
-  }
-
-  await db
-    .update(tenants)
-    .set({
-      ccipSenderAddress: parsed.data.ccipSenderAddress,
-      ccipReceiverArbitrum: parsed.data.ccipReceiverArbitrum,
-      ccipReceiverBase: parsed.data.ccipReceiverBase,
-      ccipEnabled: parsed.data.ccipEnabled,
-      updatedAt: new Date(),
-    })
-    .where(eq(tenants.id, tenantId));
-
-  return c.json({
-    success: true,
-    config: parsed.data,
-  });
 });
 
 export default app;
