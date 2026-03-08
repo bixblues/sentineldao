@@ -213,121 +213,12 @@ app.get("/api/overview", async (c) => {
 
 // ─── Database initialization ────────────────────────────────────────
 async function initDatabase() {
-  console.log("[DB] Initializing database tables...");
+  console.log("[DB] Initializing database...");
 
-  // Create multi-tenant tables first
-  db.run(sql`CREATE TABLE IF NOT EXISTS tenants (
-    id TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
-    slug TEXT NOT NULL UNIQUE,
-    owner_email TEXT NOT NULL,
-    plan TEXT NOT NULL DEFAULT 'free',
-    status TEXT NOT NULL DEFAULT 'trial',
-    created_at INTEGER NOT NULL DEFAULT (unixepoch()),
-    updated_at INTEGER NOT NULL DEFAULT (unixepoch())
-  )`);
-
-  db.run(sql`CREATE TABLE IF NOT EXISTS users (
-    id TEXT PRIMARY KEY,
-    email TEXT NOT NULL UNIQUE,
-    password_hash TEXT NOT NULL,
-    name TEXT NOT NULL,
-    email_verified INTEGER NOT NULL DEFAULT 0,
-    created_at INTEGER NOT NULL DEFAULT (unixepoch()),
-    updated_at INTEGER NOT NULL DEFAULT (unixepoch()),
-    last_login_at INTEGER
-  )`);
-
-  db.run(sql`CREATE TABLE IF NOT EXISTS memberships (
-    id TEXT PRIMARY KEY,
-    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    tenant_id TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-    role TEXT NOT NULL DEFAULT 'viewer',
-    created_at INTEGER NOT NULL DEFAULT (unixepoch())
-  )`);
-
-  // Create tables if they don't exist (inline migration for simplicity)
-  db.run(sql`CREATE TABLE IF NOT EXISTS vaults (
-    id TEXT PRIMARY KEY,
-    tenant_id TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-    name TEXT NOT NULL,
-    address TEXT NOT NULL,
-    chain TEXT NOT NULL,
-    chain_id INTEGER NOT NULL,
-    status TEXT NOT NULL DEFAULT 'monitoring',
-    alert_threshold_eth REAL NOT NULL DEFAULT 0.1,
-    created_at INTEGER NOT NULL DEFAULT (unixepoch()),
-    updated_at INTEGER NOT NULL DEFAULT (unixepoch())
-  )`);
-
-  db.run(sql`CREATE TABLE IF NOT EXISTS events (
-    id TEXT PRIMARY KEY,
-    tenant_id TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-    vault_id TEXT NOT NULL REFERENCES vaults(id),
-    type TEXT NOT NULL,
-    tx_hash TEXT NOT NULL,
-    block_number INTEGER NOT NULL,
-    from_address TEXT,
-    to_address TEXT,
-    amount TEXT,
-    amount_eth REAL,
-    chain TEXT NOT NULL,
-    timestamp INTEGER NOT NULL DEFAULT (unixepoch())
-  )`);
-
-  db.run(sql`CREATE TABLE IF NOT EXISTS threats (
-    id TEXT PRIMARY KEY,
-    tenant_id TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-    vault_id TEXT NOT NULL REFERENCES vaults(id),
-    event_id TEXT REFERENCES events(id),
-    type TEXT NOT NULL,
-    severity TEXT NOT NULL,
-    description TEXT NOT NULL,
-    chain TEXT NOT NULL,
-    tx_hash TEXT,
-    amount TEXT,
-    amount_eth REAL,
-    response_action TEXT,
-    response_status TEXT NOT NULL DEFAULT 'pending',
-    response_tx_hash TEXT,
-    detected_at INTEGER NOT NULL DEFAULT (unixepoch()),
-    resolved_at INTEGER
-  )`);
-
-  db.run(sql`CREATE TABLE IF NOT EXISTS alert_rules (
-    id TEXT PRIMARY KEY,
-    tenant_id TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-    name TEXT NOT NULL,
-    type TEXT NOT NULL,
-    enabled INTEGER NOT NULL DEFAULT 1,
-    params TEXT,
-    severity TEXT NOT NULL DEFAULT 'medium',
-    response_type TEXT NOT NULL DEFAULT 'alert_only',
-    created_at INTEGER NOT NULL DEFAULT (unixepoch())
-  )`);
-
-  db.run(sql`CREATE TABLE IF NOT EXISTS integrations (
-    id TEXT PRIMARY KEY,
-    tenant_id TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-    type TEXT NOT NULL,
-    name TEXT NOT NULL,
-    webhook_url TEXT,
-    api_key TEXT,
-    enabled INTEGER NOT NULL DEFAULT 1,
-    severities TEXT DEFAULT '["critical","high"]',
-    created_at INTEGER NOT NULL DEFAULT (unixepoch())
-  )`);
-
-  db.run(sql`CREATE TABLE IF NOT EXISTS settings (
-    key TEXT PRIMARY KEY,
-    value TEXT,
-    updated_at INTEGER NOT NULL DEFAULT (unixepoch())
-  )`);
-
-  // Initialize audit log table
+  // Initialize audit log table (still needed for audit middleware)
   initAuditLogTable();
 
-  console.log("[DB] Tables ready.");
+  console.log("[DB] Database ready. Tables managed by Drizzle migrations.");
 }
 
 async function seedDefaults() {

@@ -1,20 +1,19 @@
-import { Database } from "bun:sqlite";
-import { drizzle } from "drizzle-orm/bun-sqlite";
-import { migrate } from "drizzle-orm/bun-sqlite/migrator";
+import { drizzle } from "drizzle-orm/postgres-js";
+import { migrate } from "drizzle-orm/postgres-js/migrator";
+import postgres from "postgres";
 import { resolve } from "path";
-import { mkdirSync } from "fs";
 
-const DB_PATH = resolve(import.meta.dir, "../../data/sentinel.db");
-mkdirSync(resolve(import.meta.dir, "../../data"), { recursive: true });
+const DATABASE_URL =
+  process.env.DATABASE_URL ||
+  "postgresql://sentineldao:sentineldao_dev_password@localhost:5432/sentineldao";
 
-const sqlite = new Database(DB_PATH);
-sqlite.exec("PRAGMA journal_mode = WAL");
-sqlite.exec("PRAGMA foreign_keys = ON");
-
-const db = drizzle(sqlite);
+const migrationClient = postgres(DATABASE_URL, { max: 1 });
+const db = drizzle(migrationClient);
 
 console.log("Running migrations...");
-migrate(db, { migrationsFolder: resolve(import.meta.dir, "../../drizzle") });
+await migrate(db, {
+  migrationsFolder: resolve(import.meta.dir, "../../drizzle"),
+});
 console.log("Migrations complete.");
 
-sqlite.close();
+await migrationClient.end();
