@@ -38,9 +38,242 @@ import {
   Plus,
   Loader2,
   Send,
+  User,
+  Building2,
+  LogOut,
+  Mail,
+  Calendar,
 } from "lucide-react";
 import { useSettings, useAlertRules, useIntegrations } from "@/lib/hooks";
 import { api, type AlertRule, type Integration } from "@/lib/api";
+import { useAuth } from "@/contexts/auth-context";
+import { useRouter } from "next/navigation";
+
+// ─── Profile Section ────────────────────────────────────────────────
+function ProfileSection() {
+  const { user, tenant, membership, logout } = useAuth();
+  const router = useRouter();
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  const handleLogout = async () => {
+    setIsLoggingOut(true);
+    try {
+      await logout();
+      router.push("/login");
+    } catch (error) {
+      console.error("Logout failed:", error);
+      setIsLoggingOut(false);
+    }
+  };
+
+  const formatDate = (date: string | Date | undefined) => {
+    if (!date) return "N/A";
+    return new Date(date).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+  };
+
+  const planBadgeColor = {
+    free: "bg-slate-500/10 text-slate-400 border-slate-500/20",
+    pro: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+    enterprise: "bg-purple-500/10 text-purple-400 border-purple-500/20",
+  };
+
+  const roleBadgeColor = {
+    owner: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+    admin: "bg-blue-500/10 text-blue-400 border-blue-500/20",
+    operator: "bg-orange-500/10 text-orange-400 border-orange-500/20",
+    viewer: "bg-slate-500/10 text-slate-400 border-slate-500/20",
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* User Information */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">User Information</CardTitle>
+          <CardDescription>
+            Your account details and authentication status
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-start gap-4">
+            <div className="flex-shrink-0 w-16 h-16 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
+              <User className="w-8 h-8 text-emerald-500" />
+            </div>
+            <div className="flex-1 space-y-3">
+              <div>
+                <Label className="text-xs text-muted-foreground">Name</Label>
+                <p className="text-sm font-medium text-foreground mt-0.5">
+                  {user?.name || "N/A"}
+                </p>
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">Email</Label>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <Mail className="w-3.5 h-3.5 text-muted-foreground" />
+                  <p className="text-sm text-foreground">
+                    {user?.email || "N/A"}
+                  </p>
+                  {user?.emailVerified && (
+                    <Badge
+                      variant="outline"
+                      className="text-emerald-400 border-emerald-500/30 text-[10px] ml-1"
+                    >
+                      <CheckCircle2 className="w-2.5 h-2.5 mr-1" />
+                      Verified
+                    </Badge>
+                  )}
+                </div>
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">User ID</Label>
+                <p className="text-xs font-mono text-muted-foreground mt-0.5">
+                  {user?.id || "N/A"}
+                </p>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Organization Information */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Organization</CardTitle>
+          <CardDescription>
+            Your organization details and membership role
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-start gap-4">
+            <div className="flex-shrink-0 w-16 h-16 rounded-full bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
+              <Building2 className="w-8 h-8 text-blue-500" />
+            </div>
+            <div className="flex-1 space-y-3">
+              <div>
+                <Label className="text-xs text-muted-foreground">
+                  Organization Name
+                </Label>
+                <p className="text-sm font-medium text-foreground mt-0.5">
+                  {tenant?.name || "N/A"}
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-xs text-muted-foreground">Plan</Label>
+                  <div className="mt-1">
+                    <Badge
+                      variant="outline"
+                      className={`text-[10px] capitalize ${
+                        tenant?.plan
+                          ? planBadgeColor[tenant.plan]
+                          : "bg-slate-500/10 text-slate-400 border-slate-500/20"
+                      }`}
+                    >
+                      {tenant?.plan || "N/A"}
+                    </Badge>
+                  </div>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">
+                    Status
+                  </Label>
+                  <div className="mt-1">
+                    <Badge
+                      variant="outline"
+                      className={`text-[10px] capitalize ${
+                        tenant?.status === "active"
+                          ? "text-emerald-400 border-emerald-500/30"
+                          : "text-orange-400 border-orange-500/30"
+                      }`}
+                    >
+                      {tenant?.status || "N/A"}
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">
+                  Your Role
+                </Label>
+                <div className="mt-1">
+                  <Badge
+                    variant="outline"
+                    className={`text-[10px] capitalize ${
+                      membership?.role
+                        ? roleBadgeColor[membership.role]
+                        : "bg-slate-500/10 text-slate-400 border-slate-500/20"
+                    }`}
+                  >
+                    {membership?.role || "N/A"}
+                  </Badge>
+                </div>
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">
+                  Organization ID
+                </Label>
+                <p className="text-xs font-mono text-muted-foreground mt-0.5">
+                  {tenant?.id || "N/A"}
+                </p>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Account Actions */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Account Actions</CardTitle>
+          <CardDescription>
+            Manage your session and account settings
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between p-4 rounded-lg border border-border bg-muted/20">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center">
+                  <LogOut className="w-5 h-5 text-red-400" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-foreground">
+                    Sign Out
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    End your current session
+                  </p>
+                </div>
+              </div>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={handleLogout}
+                disabled={isLoggingOut}
+              >
+                {isLoggingOut ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Signing out...
+                  </>
+                ) : (
+                  <>
+                    <LogOut className="mr-2 h-4 w-4" />
+                    Sign Out
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
 
 // ─── Alert Rule Card (real data) ────────────────────────────────────
 function AlertRuleCard({
@@ -527,8 +760,9 @@ export function SettingsPage() {
         </p>
       </div>
 
-      <Tabs defaultValue="integrations">
+      <Tabs defaultValue="profile">
         <TabsList>
+          <TabsTrigger value="profile">Profile</TabsTrigger>
           <TabsTrigger value="integrations">
             Integrations
             {integrations && (
@@ -547,6 +781,11 @@ export function SettingsPage() {
           </TabsTrigger>
           <TabsTrigger value="defense">Defense Config</TabsTrigger>
         </TabsList>
+
+        {/* Profile Tab */}
+        <TabsContent value="profile" className="mt-6 space-y-6">
+          <ProfileSection />
+        </TabsContent>
 
         {/* Integrations Tab */}
         <TabsContent value="integrations" className="mt-6 space-y-6">
