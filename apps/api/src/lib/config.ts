@@ -2,7 +2,7 @@ export const config = {
   port: Number(process.env.API_PORT || 3001),
   rpc: {
     sepolia:
-      process.env.CRE_ETHEREUM_SEPOLIA_RPC ||
+      process.env.ETHEREUM_SEPOLIA_RPC ||
       "https://ethereum-sepolia-rpc.publicnode.com",
     arbitrumSepolia:
       process.env.ARBITRUM_SEPOLIA_RPC ||

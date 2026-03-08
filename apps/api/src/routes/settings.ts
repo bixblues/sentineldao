@@ -193,7 +193,16 @@ app.patch("/rules/:id", async (c) => {
 
 // DELETE /api/settings/rules/:id
 app.delete("/rules/:id", async (c) => {
-  await db.delete(alertRules).where(eq(alertRules.id, c.req.param("id")));
+  const { tenantId } = getTenantContext(c);
+  const id = c.req.param("id");
+
+  // Verify rule belongs to tenant before deleting
+  const existing = await db.query.alertRules.findFirst({
+    where: and(eq(alertRules.id, id), eq(alertRules.tenantId, tenantId)),
+  });
+  if (!existing) return c.json({ error: "Rule not found" }, 404);
+
+  await db.delete(alertRules).where(eq(alertRules.id, id));
   return c.json({ success: true });
 });
 

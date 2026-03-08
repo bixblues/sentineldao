@@ -25,8 +25,12 @@ class AIAnalyzer {
     const apiKey = process.env.GEMINI_API_KEY;
     if (apiKey) {
       this.genAI = new GoogleGenerativeAI(apiKey);
-      this.model = this.genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-      console.log("[AIAnalyzer] Initialized with Gemini API");
+      this.model = this.genAI.getGenerativeModel({
+        model: "gemini-2.5-flash-lite",
+      });
+      console.log(
+        "[AIAnalyzer] Initialized with Gemini 2.5 Flash-Lite (free tier)",
+      );
     } else {
       console.warn("[AIAnalyzer] GEMINI_API_KEY not set, AI analysis disabled");
     }
@@ -36,7 +40,9 @@ class AIAnalyzer {
     return this.model !== null;
   }
 
-  async analyzeThreat(context: ThreatContext): Promise<AIAnalysisResult | null> {
+  async analyzeThreat(
+    context: ThreatContext,
+  ): Promise<AIAnalysisResult | null> {
     if (!this.model) {
       return null;
     }
@@ -85,7 +91,10 @@ Analyze this threat and provide:
 Respond ONLY with valid JSON, no markdown formatting.`;
   }
 
-  private parseResponse(text: string, context: ThreatContext): AIAnalysisResult {
+  private parseResponse(
+    text: string,
+    context: ThreatContext,
+  ): AIAnalysisResult {
     try {
       // Remove markdown code blocks if present
       let cleanText = text.trim();

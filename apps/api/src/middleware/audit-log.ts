@@ -86,8 +86,8 @@ export const auditLog = createMiddleware(async (c, next) => {
   setImmediate(async () => {
     try {
       await db.execute(
-        sql`INSERT INTO audit_log (id, action, path, ip, user_agent, request_body, response_status, duration_ms, timestamp)
-            VALUES (${randomUUID()}, ${method}, ${c.req.path}, ${ip}, ${userAgent}, ${requestBody}, ${c.res.status}, ${durationMs}, NOW())`,
+        sql`INSERT INTO audit_log (id, path, ip, request_body, response_status, duration_ms, timestamp)
+            VALUES (${randomUUID()}, ${c.req.path}, ${ip}, ${requestBody}, ${c.res.status}, ${durationMs}, NOW())`,
       );
     } catch (err) {
       console.error("[AuditLog] Failed to write audit entry:", err);

@@ -450,6 +450,162 @@ function AlertRuleCard({
   );
 }
 
+// ─── Add Alert Rule Form ───────────────────────────────────────────
+function AddAlertRuleForm({ onCreated }: { onCreated: () => void }) {
+  const [type, setType] = useState<string>("large_transfer");
+  const [name, setName] = useState("");
+  const [severity, setSeverity] = useState<AlertRule["severity"]>("medium");
+  const [responseType, setResponseType] =
+    useState<AlertRule["responseType"]>("alert_only");
+  const [thresholdEth, setThresholdEth] = useState("0.1");
+  const [maxTxns, setMaxTxns] = useState("5");
+  const [creating, setCreating] = useState(false);
+
+  async function handleCreate() {
+    if (!name) return;
+    setCreating(true);
+    try {
+      const params: Record<string, unknown> = {};
+      if (type === "large_transfer") {
+        params.thresholdEth = Number(thresholdEth);
+      } else if (type === "rapid_transactions") {
+        params.maxTxnsPerMinute = Number(maxTxns);
+      } else if (type === "unauthorized_access") {
+        params.monitoredFunctions = ["setSentinel", "transferOwnership"];
+      }
+
+      await api.createRule({
+        type: type as AlertRule["type"],
+        name,
+        enabled: true,
+        severity,
+        responseType,
+        params,
+      } as Partial<AlertRule>);
+
+      // Reset form
+      setName("");
+      setType("large_transfer");
+      setSeverity("medium");
+      setResponseType("alert_only");
+      setThresholdEth("0.1");
+      setMaxTxns("5");
+      onCreated();
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  return (
+    <div className="rounded-lg border border-dashed border-border p-4 space-y-3">
+      <p className="text-sm font-medium text-foreground">Add Alert Rule</p>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1.5">
+          <Label className="text-xs">Rule Type</Label>
+          <Select value={type} onValueChange={setType}>
+            <SelectTrigger className="h-8 text-sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="large_transfer">Large Transfer</SelectItem>
+              <SelectItem value="rapid_transactions">
+                Rapid Transactions
+              </SelectItem>
+              <SelectItem value="unauthorized_access">
+                Unauthorized Access
+              </SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1.5">
+          <Label className="text-xs">Rule Name</Label>
+          <Input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="e.g. High Value Transfer Alert"
+            className="h-8 text-sm"
+          />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-3 gap-3">
+        {type === "large_transfer" && (
+          <div className="space-y-1.5">
+            <Label className="text-xs">Threshold (ETH)</Label>
+            <Input
+              type="number"
+              value={thresholdEth}
+              onChange={(e) => setThresholdEth(e.target.value)}
+              step="0.01"
+              className="h-8 text-sm"
+            />
+          </div>
+        )}
+        {type === "rapid_transactions" && (
+          <div className="space-y-1.5">
+            <Label className="text-xs">Max Txns / Minute</Label>
+            <Input
+              type="number"
+              value={maxTxns}
+              onChange={(e) => setMaxTxns(e.target.value)}
+              className="h-8 text-sm"
+            />
+          </div>
+        )}
+        <div className="space-y-1.5">
+          <Label className="text-xs">Severity</Label>
+          <Select
+            value={severity}
+            onValueChange={(v) => setSeverity(v as AlertRule["severity"])}
+          >
+            <SelectTrigger className="h-8 text-sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="critical">Critical</SelectItem>
+              <SelectItem value="high">High</SelectItem>
+              <SelectItem value="medium">Medium</SelectItem>
+              <SelectItem value="low">Low</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1.5">
+          <Label className="text-xs">Response Type</Label>
+          <Select
+            value={responseType}
+            onValueChange={(v) =>
+              setResponseType(v as AlertRule["responseType"])
+            }
+          >
+            <SelectTrigger className="h-8 text-sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="alert_only">Alert Only</SelectItem>
+              <SelectItem value="pause_single">Pause Vault</SelectItem>
+              <SelectItem value="pause_all_ccip">Pause All (CCIP)</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      <Button
+        size="sm"
+        onClick={handleCreate}
+        disabled={creating || !name}
+        className="gap-1.5"
+      >
+        {creating ? (
+          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+        ) : (
+          <Plus className="h-3.5 w-3.5" />
+        )}
+        Add Alert Rule
+      </Button>
+    </div>
+  );
+}
+
 // ─── Integration Card (real data) ───────────────────────────────────
 const INTEGRATION_META: Record<
   string,
@@ -1102,22 +1258,31 @@ export function SettingsPage() {
                     <Skeleton key={i} className="h-[140px] rounded-lg" />
                   ))}
                 </div>
-              ) : rules && rules.length > 0 ? (
-                rules.map((rule) => (
-                  <AlertRuleCard
-                    key={rule.id}
-                    rule={rule}
-                    onUpdate={refetchRules}
-                    onDelete={refetchRules}
-                  />
-                ))
               ) : (
-                <div className="text-center py-8">
-                  <AlertTriangle className="h-8 w-8 text-muted-foreground/30 mx-auto mb-2" />
-                  <p className="text-sm text-muted-foreground">
-                    No alert rules configured
-                  </p>
-                </div>
+                <>
+                  {rules && rules.length > 0 ? (
+                    <div className="space-y-4">
+                      {rules.map((rule) => (
+                        <AlertRuleCard
+                          key={rule.id}
+                          rule={rule}
+                          onUpdate={refetchRules}
+                          onDelete={refetchRules}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8">
+                      <AlertTriangle className="h-8 w-8 text-muted-foreground/30 mx-auto mb-2" />
+                      <p className="text-sm text-muted-foreground">
+                        No alert rules configured yet
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Add Alert Rule Form */}
+                  <AddAlertRuleForm onCreated={refetchRules} />
+                </>
               )}
             </CardContent>
           </Card>

@@ -166,6 +166,8 @@ class CRERunner {
         CRE_WORKFLOW_NAME,
         "--target",
         "staging-settings",
+        "--env",
+        ".env",
         "--evm-tx-hash",
         txHash,
         "--evm-event-index",

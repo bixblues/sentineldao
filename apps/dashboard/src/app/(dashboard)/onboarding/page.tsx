@@ -536,7 +536,7 @@ export default function OnboardingPage() {
                         You can deploy ProtectedVault contracts using Foundry.
                         Check our{" "}
                         <a
-                          href="https://github.com/bixblues/sentineldao/blob/main/DEPLOYMENT_GUIDE.md"
+                          href="https://github.com/bixblues/sentineldao/blob/main/packages/contracts/DEPLOYMENT_GUIDE.md"
                           target="_blank"
                           rel="noopener noreferrer"
                           className="text-primary hover:underline"

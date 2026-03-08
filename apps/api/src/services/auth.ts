@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 import { eq, and } from "drizzle-orm";
 import { db } from "../db/index.js";
-import { users, tenants, memberships } from "../db/schema.js";
+import { users, tenants, memberships, alertRules } from "../db/schema.js";
 import type { User, Tenant, Membership } from "../db/schema.js";
 
 // JWT secret from env (fallback for dev only)
@@ -204,6 +204,40 @@ export const authService = {
       role: "owner",
       createdAt: new Date(),
     });
+
+    // Create default alert rules for the new tenant
+    await db.insert(alertRules).values([
+      {
+        id: randomUUID(),
+        tenantId,
+        name: "Large Transfer Alert",
+        type: "large_transfer",
+        enabled: true,
+        params: { thresholdEth: 0.1 },
+        severity: "medium",
+        responseType: "alert_only",
+      },
+      {
+        id: randomUUID(),
+        tenantId,
+        name: "Rapid Transaction Alert",
+        type: "rapid_transactions",
+        enabled: true,
+        params: { maxTxnsPerMinute: 5 },
+        severity: "high",
+        responseType: "pause_single",
+      },
+      {
+        id: randomUUID(),
+        tenantId,
+        name: "Unauthorized Access Alert",
+        type: "unauthorized_access",
+        enabled: true,
+        params: { monitoredFunctions: ["setSentinel", "transferOwnership"] },
+        severity: "critical",
+        responseType: "pause_all_ccip",
+      },
+    ]);
 
     // Generate JWT
     const token = await generateToken(userRecord as User, tenantId, "owner");
