@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -37,7 +37,7 @@ type SimStep = {
 
 export function SimulatorPanel() {
   const [open, setOpen] = useState(false);
-  const [running, setRunning] = useState(false);
+  const [runningType, setRunningType] = useState<string | null>(null);
   const [result, setResult] = useState<{
     success: boolean;
     message: string;
@@ -48,11 +48,19 @@ export function SimulatorPanel() {
   const [balanceAddress, setBalanceAddress] = useState<string | null>(null);
   const { data: vaults } = useVaults();
   const [selectedVaultId, setSelectedVaultId] = useState<string | null>(null);
+  const processedStepsRef = useRef<Set<string>>(new Set());
 
   // Listen for simulation WebSocket events via callback
   useWebSocket((msg: WSMessage) => {
     if (msg.type === "simulation_step" && msg.payload) {
-      setSteps((prev) => [...prev, msg.payload as SimStep]);
+      const step = msg.payload as SimStep;
+      const stepKey = `${step.step}-${step.message}`;
+
+      // Only add if we haven't seen this step before
+      if (!processedStepsRef.current.has(stepKey)) {
+        processedStepsRef.current.add(stepKey);
+        setSteps((prev) => [...prev, step]);
+      }
     }
   });
 
@@ -82,9 +90,10 @@ export function SimulatorPanel() {
   }
 
   async function runSimulation(type: string, count?: number) {
-    setRunning(true);
+    setRunningType(type);
     setResult(null);
     setSteps([]);
+    processedStepsRef.current.clear();
     try {
       const data = await api.simulateAttack({
         type,
@@ -102,7 +111,7 @@ export function SimulatorPanel() {
         message: err?.message || "Simulation failed",
       });
     } finally {
-      setRunning(false);
+      setRunningType(null);
     }
   }
 
@@ -179,9 +188,9 @@ export function SimulatorPanel() {
               size="sm"
               className="w-full h-9 text-xs gap-2 justify-start"
               onClick={() => runSimulation("large_deposit")}
-              disabled={running}
+              disabled={runningType === "large_deposit"}
             >
-              {running ? (
+              {runningType === "large_deposit" ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
               ) : (
                 <Flame className="h-3.5 w-3.5" />
@@ -197,9 +206,9 @@ export function SimulatorPanel() {
               size="sm"
               className="w-full h-9 text-xs gap-2 justify-start"
               onClick={() => runSimulation("rapid_transactions", 6)}
-              disabled={running}
+              disabled={runningType === "rapid_transactions"}
             >
-              {running ? (
+              {runningType === "rapid_transactions" ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
               ) : (
                 <Activity className="h-3.5 w-3.5" />
@@ -213,9 +222,9 @@ export function SimulatorPanel() {
               size="sm"
               className="w-full h-9 text-xs gap-2 justify-start"
               onClick={() => runSimulation("flash_loan")}
-              disabled={running}
+              disabled={runningType === "flash_loan"}
             >
-              {running ? (
+              {runningType === "flash_loan" ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
               ) : (
                 <RefreshCw className="h-3.5 w-3.5" />
@@ -231,9 +240,9 @@ export function SimulatorPanel() {
               size="sm"
               className="w-full h-9 text-xs gap-2 justify-start"
               onClick={() => runSimulation("tvl_drain")}
-              disabled={running}
+              disabled={runningType === "tvl_drain"}
             >
-              {running ? (
+              {runningType === "tvl_drain" ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
               ) : (
                 <TrendingDown className="h-3.5 w-3.5" />
@@ -249,9 +258,9 @@ export function SimulatorPanel() {
               size="sm"
               className="w-full h-9 text-xs gap-2 justify-start"
               onClick={() => runSimulation("unauthorized_pause")}
-              disabled={running}
+              disabled={runningType === "unauthorized_pause"}
             >
-              {running ? (
+              {runningType === "unauthorized_pause" ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
               ) : (
                 <ShieldOff className="h-3.5 w-3.5" />
@@ -265,9 +274,9 @@ export function SimulatorPanel() {
               size="sm"
               className="w-full h-9 text-xs gap-2 justify-start"
               onClick={() => runSimulation("withdrawal")}
-              disabled={running}
+              disabled={runningType === "withdrawal"}
             >
-              {running ? (
+              {runningType === "withdrawal" ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
               ) : (
                 <ArrowDownToLine className="h-3.5 w-3.5" />
@@ -288,7 +297,7 @@ export function SimulatorPanel() {
                   <span className="text-foreground">{step.message}</span>
                 </div>
               ))}
-              {running && (
+              {runningType && (
                 <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
                   <Loader2 className="h-3 w-3 animate-spin" />
                   Processing...
