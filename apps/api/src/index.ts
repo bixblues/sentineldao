@@ -216,7 +216,7 @@ async function initDatabase() {
   console.log("[DB] Initializing database...");
 
   // Initialize audit log table (still needed for audit middleware)
-  initAuditLogTable();
+  await initAuditLogTable();
 
   console.log("[DB] Database ready. Tables managed by Drizzle migrations.");
 }

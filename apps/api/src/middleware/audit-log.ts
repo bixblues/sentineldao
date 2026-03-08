@@ -20,26 +20,30 @@ export interface AuditEntry {
 }
 
 // Ensure audit_log table exists
-export function initAuditLogTable() {
-  db.run(sql`CREATE TABLE IF NOT EXISTS audit_log (
-    id TEXT PRIMARY KEY,
-    action TEXT NOT NULL,
-    path TEXT NOT NULL,
-    ip TEXT NOT NULL,
-    user_agent TEXT,
-    request_body TEXT,
-    response_status INTEGER NOT NULL,
-    duration_ms INTEGER NOT NULL,
-    timestamp TEXT NOT NULL DEFAULT (datetime('now'))
-  )`);
+export async function initAuditLogTable() {
+  try {
+    await db.execute(sql`CREATE TABLE IF NOT EXISTS audit_log (
+      id TEXT PRIMARY KEY,
+      action TEXT NOT NULL,
+      path TEXT NOT NULL,
+      ip TEXT NOT NULL,
+      user_agent TEXT,
+      request_body TEXT,
+      response_status INTEGER NOT NULL,
+      duration_ms INTEGER NOT NULL,
+      timestamp TIMESTAMP NOT NULL DEFAULT NOW()
+    )`);
 
-  // Index for querying recent actions
-  db.run(
-    sql`CREATE INDEX IF NOT EXISTS idx_audit_log_timestamp ON audit_log(timestamp)`,
-  );
-  db.run(
-    sql`CREATE INDEX IF NOT EXISTS idx_audit_log_path ON audit_log(path)`,
-  );
+    // Index for querying recent actions
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS idx_audit_log_timestamp ON audit_log(timestamp)`,
+    );
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS idx_audit_log_path ON audit_log(path)`,
+    );
+  } catch (err) {
+    console.error("[AuditLog] Failed to initialize audit_log table:", err);
+  }
 }
 
 export const auditLog = createMiddleware(async (c, next) => {
@@ -79,14 +83,16 @@ export const auditLog = createMiddleware(async (c, next) => {
   const durationMs = Date.now() - startTime;
 
   // Write audit entry asynchronously (don't block response)
-  try {
-    db.run(
-      sql`INSERT INTO audit_log (id, action, path, ip, user_agent, request_body, response_status, duration_ms, timestamp)
-          VALUES (${randomUUID()}, ${method}, ${c.req.path}, ${ip}, ${userAgent}, ${requestBody}, ${c.res.status}, ${durationMs}, ${new Date().toISOString()})`,
-    );
-  } catch (err) {
-    console.error("[AuditLog] Failed to write audit entry:", err);
-  }
+  setImmediate(async () => {
+    try {
+      await db.execute(
+        sql`INSERT INTO audit_log (id, action, path, ip, user_agent, request_body, response_status, duration_ms, timestamp)
+            VALUES (${randomUUID()}, ${method}, ${c.req.path}, ${ip}, ${userAgent}, ${requestBody}, ${c.res.status}, ${durationMs}, NOW())`,
+      );
+    } catch (err) {
+      console.error("[AuditLog] Failed to write audit entry:", err);
+    }
+  });
 });
 
 // Redact sensitive fields from request bodies
@@ -114,13 +120,12 @@ function redactSensitive(body: string): string {
 }
 
 // ─── Query audit log ────────────────────────────────────────────────
-export function getRecentAuditEntries(limit = 50): AuditEntry[] {
-  const rows = db
-    .all(
-      sql`SELECT * FROM audit_log ORDER BY timestamp DESC LIMIT ${limit}`,
-    ) as any[];
+export async function getRecentAuditEntries(limit = 50): Promise<AuditEntry[]> {
+  const result = await db.execute(
+    sql`SELECT * FROM audit_log ORDER BY timestamp DESC LIMIT ${limit}`,
+  );
 
-  return rows.map((r) => ({
+  return (result as any[]).map((r) => ({
     id: r.id,
     action: r.action,
     path: r.path,
