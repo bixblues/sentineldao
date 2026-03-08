@@ -20,6 +20,11 @@ export const tenants = pgTable("tenants", {
   status: text("status", { enum: ["active", "suspended", "trial"] })
     .notNull()
     .default("trial"),
+  // CCIP configuration (tenant-specific)
+  ccipSenderAddress: text("ccip_sender_address"), // Sepolia CCIP sender contract
+  ccipReceiverArbitrum: text("ccip_receiver_arbitrum"), // Arbitrum Sepolia receiver
+  ccipReceiverBase: text("ccip_receiver_base"), // Base Sepolia receiver
+  ccipEnabled: boolean("ccip_enabled").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

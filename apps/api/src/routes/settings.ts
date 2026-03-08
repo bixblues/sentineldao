@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import { db } from "../db/index.js";
-import { settings, alertRules, integrations } from "../db/schema.js";
+import { settings, alertRules, integrations, tenants } from "../db/schema.js";
 import { eq, and } from "drizzle-orm";
 import { testWebhook } from "../services/notifications.js";
 import { randomUUID } from "crypto";
@@ -176,6 +176,74 @@ app.post("/integrations/:id/test", async (c) => {
 
   const success = await testWebhook(integration.type, integration.webhookUrl);
   return c.json({ success });
+});
+
+// ─── CCIP Configuration ─────────────────────────────────────────────────
+
+const ccipConfigSchema = z.object({
+  ccipSenderAddress: z
+    .string()
+    .regex(/^0x[a-fA-F0-9]{40}$/)
+    .optional(),
+  ccipReceiverArbitrum: z
+    .string()
+    .regex(/^0x[a-fA-F0-9]{40}$/)
+    .optional(),
+  ccipReceiverBase: z
+    .string()
+    .regex(/^0x[a-fA-F0-9]{40}$/)
+    .optional(),
+  ccipEnabled: z.boolean(),
+});
+
+// GET /api/settings/ccip
+app.get("/ccip", async (c) => {
+  const { tenantId } = getTenantContext(c);
+
+  const tenant = await db.query.tenants.findFirst({
+    where: eq(tenants.id, tenantId),
+  });
+
+  if (!tenant) {
+    return c.json({ error: "Tenant not found" }, 404);
+  }
+
+  return c.json({
+    ccipSenderAddress: tenant.ccipSenderAddress,
+    ccipReceiverArbitrum: tenant.ccipReceiverArbitrum,
+    ccipReceiverBase: tenant.ccipReceiverBase,
+    ccipEnabled: tenant.ccipEnabled,
+  });
+});
+
+// PUT /api/settings/ccip
+app.put("/ccip", async (c) => {
+  const { tenantId } = getTenantContext(c);
+  const body = await c.req.json();
+
+  const parsed = ccipConfigSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json(
+      { error: "Validation failed", details: parsed.error.flatten() },
+      400,
+    );
+  }
+
+  await db
+    .update(tenants)
+    .set({
+      ccipSenderAddress: parsed.data.ccipSenderAddress,
+      ccipReceiverArbitrum: parsed.data.ccipReceiverArbitrum,
+      ccipReceiverBase: parsed.data.ccipReceiverBase,
+      ccipEnabled: parsed.data.ccipEnabled,
+      updatedAt: new Date(),
+    })
+    .where(eq(tenants.id, tenantId));
+
+  return c.json({
+    success: true,
+    config: parsed.data,
+  });
 });
 
 export default app;

@@ -228,10 +228,20 @@ class DefenseExecutor {
   // ─── CCIP Cross-Chain Defense ─────────────────────────────────────
 
   /**
-   * Send a CCIP pause command from the Sender contract on Sepolia
-   * to a Receiver contract on a remote chain.
+   * Send a cross-chain CCIP message to pause a vault on another chain
+   * @param destinationChainKey - Target chain for the CCIP message
+   * @param ccipConfig - Optional tenant-specific CCIP configuration. Falls back to global config.
    */
-  async crossChainPauseVault(destinationChainKey: string): Promise<{
+  async crossChainPauseVault(
+    destinationChainKey: "arbitrum-sepolia" | "base-sepolia",
+    ccipConfig?: {
+      senderAddress: `0x${string}`;
+      receivers: {
+        "arbitrum-sepolia"?: `0x${string}`;
+        "base-sepolia"?: `0x${string}`;
+      };
+    },
+  ): Promise<{
     txHash: Hash;
     messageId: string;
     chain: string;
@@ -242,15 +252,18 @@ class DefenseExecutor {
       return null;
     }
 
-    const senderAddress = config.ccip.senderAddress;
+    const senderAddress =
+      ccipConfig?.senderAddress || config.ccip.senderAddress;
     if (!senderAddress) {
       console.error("[CCIP] No CCIP sender address configured");
       return null;
     }
 
-    const receiverAddress = (
-      config.ccip.receivers as Record<string, `0x${string}`>
-    )[destinationChainKey];
+    const receiverAddress =
+      ccipConfig?.receivers[destinationChainKey] ||
+      (config.ccip.receivers as Record<string, `0x${string}`>)[
+        destinationChainKey
+      ];
     if (!receiverAddress) {
       console.error(`[CCIP] No receiver configured for ${destinationChainKey}`);
       return null;
@@ -360,8 +373,19 @@ class DefenseExecutor {
    * Cross-chain pause ALL vaults:
    * - Pause the Sepolia vault directly (same chain as sender)
    * - Send CCIP messages to pause Arb Sepolia + Base Sepolia vaults
+   * @param sepoliaVaultAddress - The Sepolia vault to pause locally
+   * @param ccipConfig - Optional tenant-specific CCIP configuration. Falls back to global config.
    */
-  async crossChainPauseAll(sepoliaVaultAddress: `0x${string}`): Promise<{
+  async crossChainPauseAll(
+    sepoliaVaultAddress: `0x${string}`,
+    ccipConfig?: {
+      senderAddress: `0x${string}`;
+      receivers: {
+        "arbitrum-sepolia"?: `0x${string}`;
+        "base-sepolia"?: `0x${string}`;
+      };
+    },
+  ): Promise<{
     localPause: { txHash: Hash; chain: string } | null;
     ccipMessages: Array<{
       txHash: Hash;
@@ -391,12 +415,18 @@ class DefenseExecutor {
 
     // 2. Send CCIP to Arbitrum Sepolia
     console.log("[CCIP] Step 2: Sending CCIP pause to Arbitrum Sepolia...");
-    const arbResult = await this.crossChainPauseVault("arbitrum-sepolia");
+    const arbResult = await this.crossChainPauseVault(
+      "arbitrum-sepolia",
+      ccipConfig,
+    );
     if (arbResult) results.ccipMessages.push(arbResult);
 
     // 3. Send CCIP to Base Sepolia
     console.log("[CCIP] Step 3: Sending CCIP pause to Base Sepolia...");
-    const baseResult = await this.crossChainPauseVault("base-sepolia");
+    const baseResult = await this.crossChainPauseVault(
+      "base-sepolia",
+      ccipConfig,
+    );
     if (baseResult) results.ccipMessages.push(baseResult);
 
     console.log("[CCIP] === CROSS-CHAIN DEFENSE COMPLETE ===");
@@ -412,16 +442,22 @@ class DefenseExecutor {
 
   /**
    * Get the LINK balance of the CCIP Sender contract
+   * @param senderAddress - Optional tenant-specific CCIP sender address. Falls back to global config.
    */
-  async getCCIPSenderLinkBalance(): Promise<string> {
+  async getCCIPSenderLinkBalance(
+    senderAddress?: `0x${string}`,
+  ): Promise<string> {
     try {
+      const address = senderAddress || config.ccip.senderAddress;
+      if (!address) return "0";
+
       const publicClient = createPublicClient({
         chain: sepolia,
         transport: http(config.rpc.sepolia),
       });
 
       const balance = await publicClient.readContract({
-        address: config.ccip.senderAddress,
+        address,
         abi: ccipSenderAbi,
         functionName: "getLinkBalance",
       });

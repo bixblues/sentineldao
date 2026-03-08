@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import {
   Card,
   CardContent,
@@ -702,6 +702,256 @@ function AddIntegrationForm({ onCreated }: { onCreated: () => void }) {
   );
 }
 
+// ─── CCIP Configuration Section ─────────────────────────────────────
+function CCIPConfigSection() {
+  const [config, setConfig] = useState<{
+    ccipSenderAddress: string | null;
+    ccipReceiverArbitrum: string | null;
+    ccipReceiverBase: string | null;
+    ccipEnabled: boolean;
+  } | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+
+  // Form state
+  const [senderAddress, setSenderAddress] = useState("");
+  const [arbitrumReceiver, setArbitrumReceiver] = useState("");
+  const [baseReceiver, setBaseReceiver] = useState("");
+  const [enabled, setEnabled] = useState(false);
+
+  // Load current config
+  const loadConfig = useCallback(async () => {
+    try {
+      setLoading(true);
+      const data = await api.getCCIPConfig();
+      setConfig(data);
+      setSenderAddress(data.ccipSenderAddress || "");
+      setArbitrumReceiver(data.ccipReceiverArbitrum || "");
+      setBaseReceiver(data.ccipReceiverBase || "");
+      setEnabled(data.ccipEnabled);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load config");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Load config on mount
+  useEffect(() => {
+    loadConfig();
+  }, [loadConfig]);
+
+  const handleSave = async () => {
+    setError(null);
+    setSuccess(false);
+    setSaving(true);
+
+    try {
+      await api.updateCCIPConfig({
+        ccipSenderAddress: senderAddress || undefined,
+        ccipReceiverArbitrum: arbitrumReceiver || undefined,
+        ccipReceiverBase: baseReceiver || undefined,
+        ccipEnabled: enabled,
+      });
+      setSuccess(true);
+      await loadConfig();
+      setTimeout(() => setSuccess(false), 3000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save config");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <Card>
+        <CardHeader>
+          <Skeleton className="h-6 w-48" />
+          <Skeleton className="h-4 w-96 mt-2" />
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <Skeleton className="h-20 w-full" />
+            <Skeleton className="h-20 w-full" />
+            <Skeleton className="h-20 w-full" />
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center gap-2">
+          <Globe className="h-5 w-5 text-primary" />
+          <CardTitle className="text-base">
+            Chainlink CCIP Configuration
+          </CardTitle>
+        </div>
+        <CardDescription>
+          Configure your tenant-specific CCIP sender and receiver contracts for
+          cross-chain defense capabilities
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        {/* Status Banner */}
+        {config?.ccipEnabled ? (
+          <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4 text-primary" />
+              <span className="text-sm font-medium text-foreground">
+                CCIP Enabled
+              </span>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Cross-chain defense is active. You can pause vaults across all
+              chains simultaneously.
+            </p>
+          </div>
+        ) : (
+          <div className="rounded-lg border border-orange-500/20 bg-orange-500/5 p-4">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-orange-400" />
+              <span className="text-sm font-medium text-foreground">
+                CCIP Not Configured
+              </span>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Deploy your CCIP contracts and configure them below to enable
+              cross-chain defense.
+            </p>
+          </div>
+        )}
+
+        {/* Form Fields */}
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="sender">CCIP Sender Address (Sepolia)</Label>
+            <Input
+              id="sender"
+              placeholder="0x..."
+              value={senderAddress}
+              onChange={(e) => setSenderAddress(e.target.value)}
+              className="font-mono text-sm"
+            />
+            <p className="text-xs text-muted-foreground">
+              Your SentinelCCIPSender contract deployed on Ethereum Sepolia
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="arb-receiver">
+              CCIP Receiver Address (Arbitrum Sepolia)
+            </Label>
+            <Input
+              id="arb-receiver"
+              placeholder="0x..."
+              value={arbitrumReceiver}
+              onChange={(e) => setArbitrumReceiver(e.target.value)}
+              className="font-mono text-sm"
+            />
+            <p className="text-xs text-muted-foreground">
+              Your SentinelCCIPReceiver contract on Arbitrum Sepolia
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="base-receiver">
+              CCIP Receiver Address (Base Sepolia)
+            </Label>
+            <Input
+              id="base-receiver"
+              placeholder="0x..."
+              value={baseReceiver}
+              onChange={(e) => setBaseReceiver(e.target.value)}
+              className="font-mono text-sm"
+            />
+            <p className="text-xs text-muted-foreground">
+              Your SentinelCCIPReceiver contract on Base Sepolia
+            </p>
+          </div>
+
+          <Separator />
+
+          <div className="flex items-center justify-between rounded-lg border border-border p-4">
+            <div className="space-y-0.5">
+              <Label htmlFor="ccip-enabled" className="text-sm font-medium">
+                Enable CCIP Defense
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Activate cross-chain pause functionality
+              </p>
+            </div>
+            <Switch
+              id="ccip-enabled"
+              checked={enabled}
+              onCheckedChange={setEnabled}
+            />
+          </div>
+        </div>
+
+        {/* Error/Success Messages */}
+        {error && (
+          <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-3">
+            <p className="text-xs text-destructive">{error}</p>
+          </div>
+        )}
+        {success && (
+          <div className="rounded-lg border border-primary/20 bg-primary/5 p-3">
+            <p className="text-xs text-primary">
+              Configuration saved successfully!
+            </p>
+          </div>
+        )}
+
+        {/* Save Button */}
+        <Button onClick={handleSave} disabled={saving} className="w-full">
+          {saving ? (
+            <>
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              Saving...
+            </>
+          ) : (
+            <>
+              <CheckCircle2 className="h-4 w-4 mr-2" />
+              Save CCIP Configuration
+            </>
+          )}
+        </Button>
+
+        {/* Help Text */}
+        <div className="rounded-lg border border-border bg-muted/20 p-4">
+          <h4 className="text-sm font-medium text-foreground mb-2">
+            How to set up CCIP
+          </h4>
+          <ol className="text-xs text-muted-foreground space-y-1 list-decimal list-inside">
+            <li>Deploy SentinelCCIPSender contract on Ethereum Sepolia</li>
+            <li>
+              Deploy SentinelCCIPReceiver contracts on Arbitrum & Base Sepolia
+            </li>
+            <li>Fund your sender contract with LINK tokens</li>
+            <li>Set the receiver contracts as sentinels on your vaults</li>
+            <li>Enter the contract addresses above and enable CCIP</li>
+          </ol>
+          <a
+            href="https://docs.chain.link/ccip"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-primary hover:underline mt-2 inline-flex items-center gap-1"
+          >
+            View CCIP Documentation
+            <ExternalLink className="h-3 w-3" />
+          </a>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 // ─── Main Settings Page ─────────────────────────────────────────────
 export function SettingsPage() {
   const {
@@ -780,6 +1030,7 @@ export function SettingsPage() {
             )}
           </TabsTrigger>
           <TabsTrigger value="defense">Defense Config</TabsTrigger>
+          <TabsTrigger value="ccip">CCIP Setup</TabsTrigger>
         </TabsList>
 
         {/* Profile Tab */}
@@ -1058,6 +1309,11 @@ export function SettingsPage() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* CCIP Setup Tab */}
+        <TabsContent value="ccip" className="mt-6 space-y-6">
+          <CCIPConfigSection />
         </TabsContent>
       </Tabs>
     </div>

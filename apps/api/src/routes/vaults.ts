@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import { db } from "../db/index.js";
-import { vaults } from "../db/schema.js";
+import { vaults, tenants } from "../db/schema.js";
 import { eq, and } from "drizzle-orm";
 import { getVaultOnChainData } from "../services/chain-reader.js";
 import { defenseExecutor } from "../services/defense-executor.js";
@@ -233,6 +233,8 @@ app.post("/:id/unpause", async (c) => {
 
 // POST /api/vaults/ccip/pause-all — cross-chain CCIP defense: pause ALL vaults
 app.post("/ccip/pause-all", async (c) => {
+  const { tenantId } = getTenantContext(c);
+
   if (!defenseExecutor.isConfigured) {
     return c.json(
       { error: "Defense executor not configured (no private key)" },
@@ -240,13 +242,31 @@ app.post("/ccip/pause-all", async (c) => {
     );
   }
 
+  // Fetch tenant-specific CCIP configuration
+  const tenant = await db.query.tenants.findFirst({
+    where: eq(tenants.id, tenantId),
+  });
+
+  if (!tenant || !tenant.ccipEnabled || !tenant.ccipSenderAddress) {
+    return c.json(
+      {
+        error:
+          "CCIP not configured for this tenant. Please configure CCIP sender and receiver contracts.",
+      },
+      403,
+    );
+  }
+
   // Find the Sepolia vault to pause locally
   const sepoliaVault = await db.query.vaults.findFirst({
-    where: eq(vaults.chain, "ethereum-sepolia"),
+    where: and(
+      eq(vaults.tenantId, tenantId),
+      eq(vaults.chain, "ethereum-sepolia"),
+    ),
   });
 
   if (!sepoliaVault) {
-    return c.json({ error: "No Sepolia vault found" }, 404);
+    return c.json({ error: "No Sepolia vault found for this tenant" }, 404);
   }
 
   wsManager.broadcast("ccip_defense_started", {
@@ -255,6 +275,15 @@ app.post("/ccip/pause-all", async (c) => {
 
   const result = await defenseExecutor.crossChainPauseAll(
     sepoliaVault.address as `0x${string}`,
+    {
+      senderAddress: tenant.ccipSenderAddress as `0x${string}`,
+      receivers: {
+        "arbitrum-sepolia": tenant.ccipReceiverArbitrum as
+          | `0x${string}`
+          | undefined,
+        "base-sepolia": tenant.ccipReceiverBase as `0x${string}` | undefined,
+      },
+    },
   );
 
   // Update all vault statuses in DB
@@ -306,16 +335,39 @@ app.post("/ccip/pause-all", async (c) => {
 
 // GET /api/vaults/ccip/status — CCIP sender status (LINK balance, config)
 app.get("/ccip/status", async (c) => {
-  const linkBalance = await defenseExecutor.getCCIPSenderLinkBalance();
+  const { tenantId } = getTenantContext(c);
+
+  // Fetch tenant-specific CCIP configuration
+  const tenant = await db.query.tenants.findFirst({
+    where: eq(tenants.id, tenantId),
+  });
+
+  if (!tenant || !tenant.ccipEnabled || !tenant.ccipSenderAddress) {
+    return c.json({
+      configured: false,
+      senderAddress: null,
+      senderChain: null,
+      linkBalance: "0",
+      receivers: {
+        "arbitrum-sepolia": null,
+        "base-sepolia": null,
+      },
+    });
+  }
+
+  // Get LINK balance for this tenant's CCIP sender
+  const linkBalance = await defenseExecutor.getCCIPSenderLinkBalance(
+    tenant.ccipSenderAddress as `0x${string}`,
+  );
 
   return c.json({
-    configured: defenseExecutor.isConfigured,
-    senderAddress: process.env.CCIP_SENDER_ADDRESS || null,
+    configured: true,
+    senderAddress: tenant.ccipSenderAddress,
     senderChain: "ethereum-sepolia",
     linkBalance,
     receivers: {
-      "arbitrum-sepolia": process.env.CCIP_RECEIVER_ARB_SEPOLIA || null,
-      "base-sepolia": process.env.CCIP_RECEIVER_BASE_SEPOLIA || null,
+      "arbitrum-sepolia": tenant.ccipReceiverArbitrum,
+      "base-sepolia": tenant.ccipReceiverBase,
     },
   });
 });

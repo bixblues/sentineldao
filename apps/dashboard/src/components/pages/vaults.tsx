@@ -589,81 +589,83 @@ export function VaultsPage() {
         </div>
       )}
 
-      {/* CCIP Cross-Chain Defense */}
-      <Card className="border-primary/20 bg-gradient-to-r from-primary/5 to-transparent">
-        <CardContent className="pt-5 pb-4 px-5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                <Link2 className="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
-                  Chainlink CCIP Cross-Chain Defense
-                  <Badge
-                    variant="outline"
-                    className="text-[10px] px-1.5 py-0 border-primary/30 text-primary"
-                  >
-                    LIVE
-                  </Badge>
-                </h3>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Pause all vaults across all chains simultaneously via
-                  Chainlink CCIP messaging
-                  {ccipStatus && (
-                    <span className="ml-2 text-primary">
-                      ({ccipStatus.linkBalance} LINK available)
-                    </span>
-                  )}
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              {ccipResult && (
-                <div className="text-right text-xs space-y-0.5">
-                  {ccipResult.localPause && (
-                    <a
-                      href={ccipResult.localPause.explorerUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-primary hover:underline block"
-                    >
-                      Sepolia paused
-                    </a>
-                  )}
-                  {ccipResult.ccipMessages.map((msg) => (
-                    <a
-                      key={msg.messageId}
-                      href={msg.ccipExplorerUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-primary hover:underline block"
-                    >
-                      CCIP to{" "}
-                      {msg.chain === "arbitrum-sepolia" ? "Arb" : "Base"}:{" "}
-                      {msg.messageId.slice(0, 10)}...
-                    </a>
-                  ))}
+      {/* CCIP Cross-Chain Defense - only show if vaults exist and CCIP is configured */}
+      {vaults && vaults.length > 0 && ccipStatus?.configured && (
+        <Card className="border-primary/20 bg-gradient-to-r from-primary/5 to-transparent">
+          <CardContent className="pt-5 pb-4 px-5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <Link2 className="h-5 w-5 text-primary" />
                 </div>
-              )}
-              <Button
-                variant="destructive"
-                size="sm"
-                className="gap-2"
-                onClick={handleCCIPPauseAll}
-                disabled={ccipLoading}
-              >
-                {ccipLoading ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <Zap className="h-3.5 w-3.5" />
+                <div>
+                  <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                    Chainlink CCIP Cross-Chain Defense
+                    <Badge
+                      variant="outline"
+                      className="text-[10px] px-1.5 py-0 border-primary/30 text-primary"
+                    >
+                      LIVE
+                    </Badge>
+                  </h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Pause all vaults across all chains simultaneously via
+                    Chainlink CCIP messaging
+                    {ccipStatus && (
+                      <span className="ml-2 text-primary">
+                        ({ccipStatus.linkBalance} LINK available)
+                      </span>
+                    )}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                {ccipResult && (
+                  <div className="text-right text-xs space-y-0.5">
+                    {ccipResult.localPause && (
+                      <a
+                        href={ccipResult.localPause.explorerUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary hover:underline block"
+                      >
+                        Sepolia paused
+                      </a>
+                    )}
+                    {ccipResult.ccipMessages.map((msg) => (
+                      <a
+                        key={msg.messageId}
+                        href={msg.ccipExplorerUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary hover:underline block"
+                      >
+                        CCIP to{" "}
+                        {msg.chain === "arbitrum-sepolia" ? "Arb" : "Base"}:{" "}
+                        {msg.messageId.slice(0, 10)}...
+                      </a>
+                    ))}
+                  </div>
                 )}
-                {ccipLoading ? "Sending CCIP..." : "Cross-Chain Pause All"}
-              </Button>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  className="gap-2"
+                  onClick={handleCCIPPauseAll}
+                  disabled={ccipLoading}
+                >
+                  {ccipLoading ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Zap className="h-3.5 w-3.5" />
+                  )}
+                  {ccipLoading ? "Sending CCIP..." : "Cross-Chain Pause All"}
+                </Button>
+              </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Vault grid */}
       {loading ? (

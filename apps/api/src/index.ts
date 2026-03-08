@@ -19,7 +19,7 @@ import workflowsRoutes from "./routes/workflows.js";
 
 // Security middleware
 import { apiKeyAuth } from "./middleware/auth.js";
-import { requireAuth } from "./middleware/tenant-auth.js";
+import { requireAuth, getTenantContext } from "./middleware/tenant-auth.js";
 import {
   generalRateLimit,
   writeRateLimit,
@@ -35,11 +35,13 @@ import {
   users,
   memberships,
   vaults,
+  threats,
+  events,
   alertRules,
   integrations,
   settings,
 } from "./db/schema.js";
-import { sql } from "drizzle-orm";
+import { sql, eq } from "drizzle-orm";
 
 const app = new Hono();
 

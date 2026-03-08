@@ -349,6 +349,25 @@ export const api = {
     apiFetch<{ address: string; balance: string; chain: string }>(
       "/api/simulate/balance",
     ),
+
+  // CCIP Configuration
+  getCCIPConfig: () =>
+    apiFetch<{
+      ccipSenderAddress: string | null;
+      ccipReceiverArbitrum: string | null;
+      ccipReceiverBase: string | null;
+      ccipEnabled: boolean;
+    }>("/api/settings/ccip"),
+  updateCCIPConfig: (data: {
+    ccipSenderAddress?: string;
+    ccipReceiverArbitrum?: string;
+    ccipReceiverBase?: string;
+    ccipEnabled: boolean;
+  }) =>
+    apiFetch<{ success: boolean; config: any }>("/api/settings/ccip", {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
 };
 
 // ─── WebSocket ──────────────────────────────────────────────────────
