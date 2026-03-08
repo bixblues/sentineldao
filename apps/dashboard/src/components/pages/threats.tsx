@@ -77,26 +77,15 @@ function ThreatCard({
   onUpdate: () => void;
 }) {
   const severity = THREAT_SEVERITY[threat.severity];
-  const [analysis, setAnalysis] = useState<any>(null);
-  const [loadingAnalysis, setLoadingAnalysis] = useState(false);
   const [showAnalysis, setShowAnalysis] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
 
-  const fetchAnalysis = async () => {
-    if (analysis) {
-      setShowAnalysis(!showAnalysis);
-      return;
-    }
-    setLoadingAnalysis(true);
-    setShowAnalysis(true);
-    try {
-      const res = await api.getThreatAnalysis(threat.id);
-      setAnalysis(res.analysis);
-    } catch {
-      setAnalysis(null);
-    } finally {
-      setLoadingAnalysis(false);
-    }
+  // Check if AI analysis is available
+  const hasAIAnalysis =
+    threat.aiRiskScore !== null && threat.aiRiskScore !== undefined;
+
+  const toggleAnalysis = () => {
+    setShowAnalysis(!showAnalysis);
   };
 
   const handleDismiss = async () => {
@@ -246,24 +235,22 @@ function ThreatCard({
               </Button>
             </a>
           )}
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 text-xs gap-1.5"
-            onClick={fetchAnalysis}
-          >
-            {loadingAnalysis ? (
-              <Loader2 className="h-3 w-3 animate-spin" />
-            ) : (
+          {hasAIAnalysis && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 text-xs gap-1.5"
+              onClick={toggleAnalysis}
+            >
               <Brain className="h-3 w-3" />
-            )}
-            {showAnalysis ? "Hide" : "Analyze"}
-            {showAnalysis ? (
-              <ChevronUp className="h-3 w-3" />
-            ) : (
-              <ChevronDown className="h-3 w-3" />
-            )}
-          </Button>
+              AI Analysis
+              {showAnalysis ? (
+                <ChevronUp className="h-3 w-3" />
+              ) : (
+                <ChevronDown className="h-3 w-3" />
+              )}
+            </Button>
+          )}
           {threat.responseStatus === "pending" && (
             <>
               <Button
@@ -290,157 +277,70 @@ function ThreatCard({
         </div>
 
         {/* AI Analysis Panel */}
-        {showAnalysis && (
+        {showAnalysis && hasAIAnalysis && (
           <div className="mt-3 pt-3 border-t border-border/50 space-y-3">
-            {loadingAnalysis ? (
-              <div className="flex items-center justify-center py-6">
-                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground mr-2" />
-                <span className="text-xs text-muted-foreground">
-                  Analyzing threat...
+            {/* Risk Score */}
+            <div className="rounded-lg bg-background/80 border border-border p-3">
+              <div className="flex items-center gap-2 mb-2">
+                <Target className="h-3.5 w-3.5 text-primary" />
+                <span className="text-xs font-semibold">
+                  AI Risk Assessment
                 </span>
+                {threat.aiConfidence && (
+                  <Badge variant="outline" className="text-[10px] ml-auto">
+                    {threat.aiConfidence}% confidence
+                  </Badge>
+                )}
               </div>
-            ) : analysis ? (
-              <>
-                {/* Risk Score */}
+              <RiskScoreBar score={threat.aiRiskScore || 0} />
+              <div className="flex items-center justify-between mt-2 text-xs text-muted-foreground">
+                {threat.aiAttackVector && (
+                  <span>
+                    Attack Vector:{" "}
+                    <strong className="text-foreground">
+                      {threat.aiAttackVector}
+                    </strong>
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* AI Reasoning */}
+            {threat.aiReasoning && (
+              <div className="rounded-lg bg-background/80 border border-border p-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <Brain className="h-3.5 w-3.5 text-primary" />
+                  <span className="text-xs font-semibold">AI Analysis</span>
+                </div>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  {threat.aiReasoning}
+                </p>
+              </div>
+            )}
+
+            {/* Recommendations */}
+            {threat.aiRecommendations &&
+              threat.aiRecommendations.length > 0 && (
                 <div className="rounded-lg bg-background/80 border border-border p-3">
                   <div className="flex items-center gap-2 mb-2">
-                    <Target className="h-3.5 w-3.5 text-primary" />
+                    <Lightbulb className="h-3.5 w-3.5 text-blue-500" />
                     <span className="text-xs font-semibold">
-                      Risk Assessment
-                    </span>
-                    <Badge variant="outline" className="text-[10px] ml-auto">
-                      {analysis.confidence}% confidence
-                    </Badge>
-                  </div>
-                  <RiskScoreBar score={analysis.riskScore} />
-                  <div className="flex items-center justify-between mt-2 text-xs text-muted-foreground">
-                    <span>
-                      Classification:{" "}
-                      <strong className="text-foreground">
-                        {analysis.classification}
-                      </strong>
-                    </span>
-                    <span>
-                      Vector:{" "}
-                      <strong className="text-foreground">
-                        {analysis.attackVector}
-                      </strong>
+                      AI Recommendations
                     </span>
                   </div>
+                  <ul className="space-y-1">
+                    {threat.aiRecommendations.map((rec: string, i: number) => (
+                      <li
+                        key={i}
+                        className="text-xs text-muted-foreground flex items-start gap-1.5"
+                      >
+                        <span className="text-blue-500 mt-0.5">{i + 1}.</span>
+                        {rec}
+                      </li>
+                    ))}
+                  </ul>
                 </div>
-
-                {/* Indicators */}
-                {analysis.indicators?.length > 0 && (
-                  <div className="rounded-lg bg-background/80 border border-border p-3">
-                    <div className="flex items-center gap-2 mb-2">
-                      <ShieldAlert className="h-3.5 w-3.5 text-amber-500" />
-                      <span className="text-xs font-semibold">
-                        Threat Indicators
-                      </span>
-                    </div>
-                    <ul className="space-y-1">
-                      {analysis.indicators.map((ind: string, i: number) => (
-                        <li
-                          key={i}
-                          className="text-xs text-muted-foreground flex items-start gap-1.5"
-                        >
-                          <span className="text-amber-500 mt-0.5">-</span>
-                          {ind}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-                {/* Context */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                  <div className="rounded-lg bg-background/80 border border-border p-2 text-center">
-                    <div className="text-sm font-bold">
-                      {analysis.context.historicalThreats}
-                    </div>
-                    <div className="text-[10px] text-muted-foreground">
-                      Recent Threats
-                    </div>
-                  </div>
-                  <div className="rounded-lg bg-background/80 border border-border p-2 text-center">
-                    <div className="text-sm font-bold">
-                      {analysis.context.recentActivity}
-                    </div>
-                    <div className="text-[10px] text-muted-foreground">
-                      24h Events
-                    </div>
-                  </div>
-                  <div className="rounded-lg bg-background/80 border border-border p-2 text-center">
-                    <div className="text-sm font-bold">
-                      {analysis.context.estimatedTVL.toFixed(3)}
-                    </div>
-                    <div className="text-[10px] text-muted-foreground">
-                      Est. TVL (ETH)
-                    </div>
-                  </div>
-                  <div className="rounded-lg bg-background/80 border border-border p-2 text-center">
-                    <div className="text-sm font-bold">
-                      {analysis.context.vaultRiskProfile}
-                    </div>
-                    <div className="text-[10px] text-muted-foreground">
-                      Risk Profile
-                    </div>
-                  </div>
-                </div>
-
-                {/* Recommendations */}
-                {analysis.recommendations?.length > 0 && (
-                  <div className="rounded-lg bg-background/80 border border-border p-3">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Lightbulb className="h-3.5 w-3.5 text-blue-500" />
-                      <span className="text-xs font-semibold">
-                        Recommendations
-                      </span>
-                    </div>
-                    <ul className="space-y-1">
-                      {analysis.recommendations.map(
-                        (rec: string, i: number) => (
-                          <li
-                            key={i}
-                            className="text-xs text-muted-foreground flex items-start gap-1.5"
-                          >
-                            <span className="text-blue-500 mt-0.5">
-                              {i + 1}.
-                            </span>
-                            {rec}
-                          </li>
-                        ),
-                      )}
-                    </ul>
-                  </div>
-                )}
-
-                {/* Mitigations */}
-                {analysis.mitigations?.length > 0 && (
-                  <div className="rounded-lg bg-background/80 border border-border p-3">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Shield className="h-3.5 w-3.5 text-green-500" />
-                      <span className="text-xs font-semibold">Mitigations</span>
-                    </div>
-                    <ul className="space-y-1">
-                      {analysis.mitigations.map((mit: string, i: number) => (
-                        <li
-                          key={i}
-                          className="text-xs text-muted-foreground flex items-start gap-1.5"
-                        >
-                          <span className="text-green-500 mt-0.5">-</span>
-                          {mit}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </>
-            ) : (
-              <p className="text-xs text-muted-foreground text-center py-4">
-                Analysis unavailable
-              </p>
-            )}
+              )}
           </div>
         )}
       </CardContent>

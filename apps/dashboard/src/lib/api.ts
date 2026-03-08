@@ -64,6 +64,12 @@ export interface ThreatEvent {
   responseTxHash: string | null;
   detectedAt: string;
   resolvedAt: string | null;
+  // AI Analysis fields
+  aiRiskScore: number | null;
+  aiConfidence: number | null;
+  aiReasoning: string | null;
+  aiAttackVector: string | null;
+  aiRecommendations: string[] | null;
 }
 
 export interface ActivityEvent {
