@@ -141,26 +141,16 @@ export function Header() {
 
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-background/80 backdrop-blur-xl px-6">
-      <div className="flex items-center gap-3">
+      {/* Organization Badge */}
+      {tenant && (
         <Badge
           variant="outline"
-          className="border-primary/40 text-primary text-xs font-medium px-2.5 py-0.5"
+          className="gap-1.5 text-xs font-medium px-2.5 py-0.5"
         >
-          <span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
-          Sepolia Testnet
+          <Building2 className="h-3 w-3" />
+          {tenant.name}
         </Badge>
-
-        {/* Organization Badge */}
-        {tenant && (
-          <Badge
-            variant="outline"
-            className="gap-1.5 text-xs font-medium px-2.5 py-0.5"
-          >
-            <Building2 className="h-3 w-3" />
-            {tenant.name}
-          </Badge>
-        )}
-      </div>
+      )}
 
       <div className="flex items-center gap-3">
         {/* Notifications */}

@@ -176,9 +176,17 @@ app.get("/api/health", async (c) => {
 
 // ─── Overview stats (aggregated for dashboard) ──────────────────────
 app.get("/api/overview", async (c) => {
-  const allVaults = await db.query.vaults.findMany();
-  const allThreats = await db.query.threats.findMany();
-  const allEvents = await db.query.events.findMany();
+  const { tenantId } = getTenantContext(c);
+
+  const allVaults = await db.query.vaults.findMany({
+    where: eq(vaults.tenantId, tenantId),
+  });
+  const allThreats = await db.query.threats.findMany({
+    where: eq(threats.tenantId, tenantId),
+  });
+  const allEvents = await db.query.events.findMany({
+    where: eq(events.tenantId, tenantId),
+  });
 
   const now = Date.now();
   const oneDayAgo = now - 86_400_000;
