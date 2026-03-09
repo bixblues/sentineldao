@@ -1,5 +1,12 @@
 import { db } from "../db/index.js";
-import { threats, alertRules, vaults, events, settings } from "../db/schema.js";
+import {
+  threats,
+  alertRules,
+  vaults,
+  events,
+  settings,
+  tenants,
+} from "../db/schema.js";
 import { eq, desc, and, gte } from "drizzle-orm";
 import { wsManager } from "../lib/ws.js";
 import { notifyIntegrations } from "./notifications.js";
@@ -82,14 +89,20 @@ class ThreatEngine {
       const dedupKey = `cre:${vaultId}:${event.txHash}`;
       if (!isDuplicate(dedupKey)) {
         // Use the most appropriate rule for response type
-        const rule = await this.findBestRule(creHints.creSeverity);
+        const rule = await this.findBestRule(
+          creHints.creSeverity,
+          event.tenantId,
+        );
         await this.handleThreat(creThreat, rule);
       }
     }
 
     // Run rule-based detection (backend-side, supplements CRE analysis)
     const rules = await db.query.alertRules.findMany({
-      where: eq(alertRules.enabled, true),
+      where: and(
+        eq(alertRules.tenantId, event.tenantId),
+        eq(alertRules.enabled, true),
+      ),
     });
 
     for (const rule of rules) {
@@ -142,24 +155,37 @@ class ThreatEngine {
 
   private async findBestRule(
     severity: string,
+    tenantId: string,
   ): Promise<typeof alertRules.$inferSelect | null> {
     if (severity === "critical") {
       // For critical threats, use CCIP pause rule if available
       const ccipRule = await db.query.alertRules.findFirst({
-        where: eq(alertRules.responseType, "pause_all_ccip"),
+        where: and(
+          eq(alertRules.tenantId, tenantId),
+          eq(alertRules.responseType, "pause_all_ccip"),
+          eq(alertRules.enabled, true),
+        ),
       });
       if (ccipRule) return ccipRule;
     }
     if (severity === "critical" || severity === "high") {
       // For high/critical, use single pause rule
       const pauseRule = await db.query.alertRules.findFirst({
-        where: eq(alertRules.responseType, "pause_single"),
+        where: and(
+          eq(alertRules.tenantId, tenantId),
+          eq(alertRules.responseType, "pause_single"),
+          eq(alertRules.enabled, true),
+        ),
       });
       if (pauseRule) return pauseRule;
     }
     // Default: alert only
     const alertRule = await db.query.alertRules.findFirst({
-      where: eq(alertRules.responseType, "alert_only"),
+      where: and(
+        eq(alertRules.tenantId, tenantId),
+        eq(alertRules.responseType, "alert_only"),
+        eq(alertRules.enabled, true),
+      ),
     });
     return alertRule || null;
   }
@@ -207,7 +233,11 @@ class ThreatEngine {
 
           // Use the most aggressive rule for response
           const rule = await db.query.alertRules.findFirst({
-            where: eq(alertRules.type, "rapid_transactions"),
+            where: and(
+              eq(alertRules.tenantId, event.tenantId),
+              eq(alertRules.responseType, "pause_all_ccip"),
+              eq(alertRules.enabled, true),
+            ),
           });
           await this.handleThreat(threat, rule || null);
           return;
@@ -269,7 +299,11 @@ class ThreatEngine {
         };
 
         const rule = await db.query.alertRules.findFirst({
-          where: eq(alertRules.type, "large_transfer"),
+          where: and(
+            eq(alertRules.tenantId, event.tenantId),
+            eq(alertRules.responseType, "pause_single"),
+            eq(alertRules.enabled, true),
+          ),
         });
         await this.handleThreat(threat, rule || null);
       }
@@ -310,7 +344,11 @@ class ThreatEngine {
 
       // Force CCIP pause for correlated attacks
       const ccipRule = await db.query.alertRules.findFirst({
-        where: eq(alertRules.responseType, "pause_all_ccip"),
+        where: and(
+          eq(alertRules.tenantId, recentThreats[0].tenantId),
+          eq(alertRules.responseType, "pause_all_ccip"),
+          eq(alertRules.enabled, true),
+        ),
       });
       await this.handleThreat(threat, ccipRule || null);
     }
@@ -481,7 +519,11 @@ class ThreatEngine {
         where: eq(settings.key, "auto_pause_enabled"),
       });
 
-      if (autoPause?.value === true) {
+      // Default to true if setting doesn't exist (for demo/new tenants)
+      const autoPauseEnabled =
+        autoPause?.value === true || autoPause === undefined;
+
+      if (autoPauseEnabled) {
         console.log(
           `[ThreatEngine] Auto-pause enabled, triggering defense for vault ${threat.vaultId}`,
         );
@@ -498,8 +540,57 @@ class ThreatEngine {
               `[ThreatEngine] CCIP cross-chain defense: pausing ALL vaults`,
             );
 
+            // Fetch tenant's CCIP configuration
+            const tenant = await db.query.tenants.findFirst({
+              where: eq(tenants.id, threat.tenantId),
+            });
+
+            if (!tenant?.ccipEnabled || !tenant?.ccipSenderAddress) {
+              console.warn(
+                `[ThreatEngine] CCIP not configured for tenant ${threat.tenantId}, falling back to single pause`,
+              );
+              // Fall back to single vault pause
+              const result = await defenseExecutor.pauseVault(
+                vault.address as `0x${string}`,
+                vault.chain,
+              );
+              if (result) {
+                await db
+                  .update(threats)
+                  .set({
+                    responseStatus: "executed",
+                    responseTxHash: result.txHash,
+                    responseAction: `Emergency pause executed on-chain (CCIP not configured, single pause fallback)`,
+                    resolvedAt: new Date(),
+                  })
+                  .where(eq(threats.id, threatRecord.id));
+
+                await db
+                  .update(vaults)
+                  .set({ status: "paused", updatedAt: new Date() })
+                  .where(eq(vaults.id, threat.vaultId));
+
+                wsManager.broadcast("vault_status_change", {
+                  vaultId: threat.vaultId,
+                  status: "paused",
+                });
+              }
+              return;
+            }
+
             const ccipResult = await defenseExecutor.crossChainPauseAll(
               vault.address as `0x${string}`,
+              {
+                senderAddress: tenant.ccipSenderAddress as `0x${string}`,
+                receivers: {
+                  "arbitrum-sepolia": tenant.ccipReceiverArbitrum as
+                    | `0x${string}`
+                    | undefined,
+                  "base-sepolia": tenant.ccipReceiverBase as
+                    | `0x${string}`
+                    | undefined,
+                },
+              },
             );
 
             // Mark all vaults as paused in DB

@@ -4,18 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/contexts/auth-context";
-import { Shield, AlertCircle, Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Shield, AlertCircle, Zap, Lock, Globe } from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -41,87 +30,184 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-12 h-12 bg-emerald-600/10 border border-emerald-500/20 rounded-xl mb-4">
-            <Shield className="w-6 h-6 text-emerald-500" />
+    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+      <div className="w-full max-w-6xl grid lg:grid-cols-2 gap-8 items-center">
+        {/* Branding Section */}
+        <div className="hidden lg:block space-y-8">
+          <div>
+            <div className="inline-flex items-center gap-3 mb-6">
+              <div className="relative">
+                <div className="absolute inset-0 bg-primary blur-xl opacity-50"></div>
+                <div className="relative flex items-center justify-center w-16 h-16 bg-primary/10 border border-primary/20 rounded-2xl">
+                  <Shield className="w-8 h-8 text-primary" />
+                </div>
+              </div>
+              <div>
+                <h1 className="text-4xl font-bold text-foreground">
+                  SentinelDAO
+                </h1>
+                <p className="text-primary text-sm font-medium">
+                  Autonomous DeFi Defense
+                </p>
+              </div>
+            </div>
+            <p className="text-xl text-muted-foreground leading-relaxed">
+              Real-time cross-chain threat detection and automated defense for
+              DeFi protocols
+            </p>
           </div>
-          <h1 className="text-2xl font-bold text-white mb-1">Welcome back</h1>
-          <p className="text-sm text-slate-400">
-            Sign in to your SentinelDAO account
-          </p>
+
+          <div className="space-y-4">
+            <div className="flex items-start gap-4 p-4 rounded-xl bg-card border border-border">
+              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                <Zap className="w-5 h-5 text-primary" />
+              </div>
+              <div>
+                <h3 className="text-foreground font-semibold mb-1">
+                  Chainlink CRE Integration
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  Decentralized monitoring with EVM Log Triggers
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-4 p-4 rounded-xl bg-card border border-border">
+              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                <Globe className="w-5 h-5 text-primary" />
+              </div>
+              <div>
+                <h3 className="text-foreground font-semibold mb-1">
+                  CCIP Cross-Chain Defense
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  Pause vaults across all chains simultaneously
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-4 p-4 rounded-xl bg-card border border-border">
+              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                <Lock className="w-5 h-5 text-primary" />
+              </div>
+              <div>
+                <h3 className="text-foreground font-semibold mb-1">
+                  AI Threat Analysis
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  Google Gemini powered risk assessment
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="pt-4 border-t border-border">
+            <p className="text-sm text-muted-foreground">
+              Trusted by DeFi protocols to protect billions in TVL
+            </p>
+          </div>
         </div>
 
-        <Card className="border-slate-800 bg-slate-900/50">
-          <CardHeader>
-            <CardTitle>Sign in</CardTitle>
-            <CardDescription>
-              Enter your credentials to access your account
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Login Form Section */}
+        <div className="w-full max-w-md mx-auto lg:mx-0">
+          <div className="text-center lg:text-left mb-8 lg:hidden">
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-primary/10 border border-primary/20 rounded-2xl mb-4">
+              <Shield className="w-8 h-8 text-primary" />
+            </div>
+            <h1 className="text-3xl font-bold text-foreground mb-2">
+              SentinelDAO
+            </h1>
+            <p className="text-muted-foreground">Sign in to your account</p>
+          </div>
+          <div className="hidden lg:block mb-6">
+            <h2 className="text-2xl font-bold text-foreground mb-2">
+              Welcome back
+            </h2>
+            <p className="text-muted-foreground">
+              Sign in to access your security dashboard
+            </p>
+          </div>
+
+          <div className="bg-card backdrop-blur-sm rounded-2xl shadow-2xl p-8 border border-border">
+            <form onSubmit={handleSubmit} className="space-y-6">
               {error && (
-                <Alert variant="destructive">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
+                <div className="bg-destructive/10 border border-destructive/50 rounded-lg p-4 flex items-start gap-3">
+                  <AlertCircle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
+                  <p className="text-sm text-destructive">{error}</p>
+                </div>
               )}
 
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
+              <div>
+                <label
+                  htmlFor="email"
+                  className="block text-sm font-medium text-foreground mb-2"
+                >
+                  Email
+                </label>
+                <input
                   id="email"
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
+                  className="w-full px-4 py-3 bg-input border border-border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
                   placeholder="you@company.com"
-                  className="bg-slate-950 border-slate-800"
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
-                <Input
+              <div>
+                <label
+                  htmlFor="password"
+                  className="block text-sm font-medium text-foreground mb-2"
+                >
+                  Password
+                </label>
+                <input
                   id="password"
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
+                  className="w-full px-4 py-3 bg-input border border-border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
                   placeholder="••••••••"
-                  className="bg-slate-950 border-slate-800"
                 />
               </div>
 
-              <Button type="submit" disabled={isLoading} className="w-full">
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="w-full bg-primary hover:bg-primary/90 disabled:bg-primary/50 text-primary-foreground font-medium py-3 px-4 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2"
+              >
                 {isLoading ? (
                   <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    <div className="w-5 h-5 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
                     Signing in...
                   </>
                 ) : (
                   "Sign in"
                 )}
-              </Button>
+              </button>
+            </form>
 
-              <div className="text-center text-sm">
-                <span className="text-slate-400">Don't have an account? </span>
+            <div className="mt-6 text-center">
+              <p className="text-sm text-muted-foreground">
+                Don't have an account?{" "}
                 <Link
                   href="/signup"
-                  className="text-emerald-400 hover:text-emerald-300 font-medium"
+                  className="text-primary hover:text-primary/80 font-medium"
                 >
                   Sign up
                 </Link>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
+              </p>
+            </div>
+          </div>
 
-        <p className="text-center text-xs text-slate-500 mt-6">
-          Secure vault monitoring powered by Chainlink
-        </p>
+          <p className="text-center lg:text-left text-sm text-muted-foreground mt-8">
+            Powered by{" "}
+            <span className="text-primary font-medium">Chainlink</span> •
+            Secured by <span className="text-primary font-medium">AI</span>
+          </p>
+        </div>
       </div>
     </div>
   );
