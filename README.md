@@ -76,12 +76,14 @@ SentinelDAO is an autonomous security layer for DeFi protocols that combines AI-
 - **Purpose:** Decentralized event detection with DON consensus
 
 **Backend Integration:**
+
 - Webhook Handler: [`apps/api/src/routes/webhooks.ts`](apps/api/src/routes/webhooks.ts) (lines 50-120)
 - Threat Engine: [`apps/api/src/services/threat-engine.ts`](apps/api/src/services/threat-engine.ts)
 
 ### Chainlink CCIP (Cross-Chain Interoperability Protocol)
 
 **Smart Contracts:**
+
 - CCIP Sender: [`packages/contracts/src/SentinelCCIPSender.sol`](packages/contracts/src/SentinelCCIPSender.sol)
 - CCIP Receiver: [`packages/contracts/src/SentinelCCIPReceiver.sol`](packages/contracts/src/SentinelCCIPReceiver.sol)
 - Deployment Scripts:
@@ -89,21 +91,25 @@ SentinelDAO is an autonomous security layer for DeFi protocols that combines AI-
   - [`packages/contracts/script/DeployCCIPReceiver.s.sol`](packages/contracts/script/DeployCCIPReceiver.s.sol)
 
 **Backend Integration:**
+
 - Defense Executor: [`apps/api/src/services/defense-executor.ts`](apps/api/src/services/defense-executor.ts) (lines 150-250)
 - CCIP Routes: [`apps/api/src/routes/vaults.ts`](apps/api/src/routes/vaults.ts) (lines 200-280)
 
 **Frontend Integration:**
+
 - CCIP Status UI: [`apps/dashboard/src/components/pages/vaults.tsx`](apps/dashboard/src/components/pages/vaults.tsx) (lines 580-650)
 - API Client: [`apps/dashboard/src/lib/api.ts`](apps/dashboard/src/lib/api.ts) (lines 280-310)
 
 ### Deployed Contracts (Testnets)
 
 **ProtectedVault Contracts:**
+
 - Ethereum Sepolia: [`0xcdCc7e3d66221c22A7D2c1490120e199568fd11D`](https://sepolia.etherscan.io/address/0xcdCc7e3d66221c22A7D2c1490120e199568fd11D)
 - Arbitrum Sepolia: [`0x24Ae95b0b57e07fC65C79aD133Db6e398722B4A1`](https://sepolia.arbiscan.io/address/0x24Ae95b0b57e07fC65C79aD133Db6e398722B4A1)
 - Base Sepolia: [`0x24Ae95b0b57e07fC65C79aD133Db6e398722B4A1`](https://sepolia.basescan.org/address/0x24Ae95b0b57e07fC65C79aD133Db6e398722B4A1)
 
 **CCIP Contracts:**
+
 - Sender (Sepolia): [`0x4126f0B31FB03e650D96a1aA769F2f1A5DE16f77`](https://sepolia.etherscan.io/address/0x4126f0B31FB03e650D96a1aA769F2f1A5DE16f77)
 - Receiver (Arbitrum): [`0xcdCc7e3d66221c22A7D2c1490120e199568fd11D`](https://sepolia.arbiscan.io/address/0xcdCc7e3d66221c22A7D2c1490120e199568fd11D)
 - Receiver (Base): [`0xcdCc7e3d66221c22A7D2c1490120e199568fd11D`](https://sepolia.basescan.org/address/0xcdCc7e3d66221c22A7D2c1490120e199568fd11D)
@@ -111,12 +117,14 @@ SentinelDAO is an autonomous security layer for DeFi protocols that combines AI-
 ## 🛠️ Tech Stack
 
 ### Smart Contracts
+
 - Solidity 0.8.24
 - Foundry (Forge, Cast, Anvil)
 - OpenZeppelin Contracts
 - Chainlink CCIP SDK
 
 ### Backend
+
 - Bun Runtime
 - Hono.js (API framework)
 - PostgreSQL (Multi-tenant data)
@@ -125,6 +133,7 @@ SentinelDAO is an autonomous security layer for DeFi protocols that combines AI-
 - Google Gemini AI
 
 ### Frontend
+
 - Next.js 14 (App Router)
 - React 18
 - TypeScript
@@ -133,6 +142,7 @@ SentinelDAO is an autonomous security layer for DeFi protocols that combines AI-
 - TailwindCSS + shadcn/ui
 
 ### Infrastructure
+
 - Chainlink CRE Network
 - Chainlink CCIP
 - Docker Compose
@@ -220,6 +230,7 @@ Access the dashboard at `http://localhost:3000` and connect your wallet. Add vau
 ### 2. Simulate Attacks
 
 Use the Attack Simulator (floating button) to test threat detection:
+
 - Large Deposit (Whale Alert)
 - Rapid Transactions (Flash Drain)
 - Flash Loan Attack
@@ -233,6 +244,7 @@ Navigate to the Threats page to see detected threats with AI analysis and severi
 ### 4. Cross-Chain Defense
 
 When a high-severity threat is detected, the system automatically:
+
 1. Pauses the affected vault
 2. Sends CCIP messages to all chains
 3. Pauses vaults on Arbitrum and Base
@@ -294,8 +306,7 @@ sentineldao/
 
 ## 🎬 Demo Video
 
-[📹 Watch 5-minute demo](https://youtu.be/your-video-link)
-
+[📹 Watch 5-minute demo](https://youtu.be/yQMZ-E-QOwg)
 
 ## 🤝 Contributing
 
@@ -308,6 +319,7 @@ MIT License - see [LICENSE](LICENSE) file for details.
 ## 📞 Contact
 
 **Krishna Mahato**
+
 - Email: krishnamahato.of@gmail.com
 - GitHub: [@krishna9304](https://github.com/krishna9304)
 

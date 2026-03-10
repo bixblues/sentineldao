@@ -462,15 +462,6 @@ Restart the API server.
 
 ---
 
-## Next Steps
-
-1. **Deploy CRE Workflow:** Follow [CRE_SETUP.md](./CRE_SETUP.md) to deploy decentralized monitoring
-2. **Production Deployment:** Deploy API and dashboard to hosting service
-3. **Custom Alert Rules:** Configure threat detection thresholds in Settings
-4. **Integrate Webhooks:** Set up Slack/Discord notifications
-
----
-
 ## Support
 
 - **Documentation:** [README.md](./README.md)
